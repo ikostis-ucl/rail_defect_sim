@@ -1,0 +1,16 @@
+$ErrorActionPreference = "Stop"
+$BlenderBin = if ($env:BLENDER_BIN) { $env:BLENDER_BIN } else { "C:\Program Files\Blender Foundation\Blender 5.1\blender.exe" }
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+
+& $BlenderBin `
+    --background `
+    --python "$ProjectRoot\run_video_gen.py" `
+    -- `
+    --fps 30 `
+    --duration-seconds 60 `
+    --resolution-x 3840 `
+    --resolution-y 2160 `
+    --render-engine BLENDER_EEVEE `
+    --track-length 120000 `
+    --base-speed-units-per-frame 2.5 `
+    @args

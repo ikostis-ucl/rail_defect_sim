@@ -55,16 +55,22 @@ def test_empty_payload_produces_key():
     assert len(k) == 16
 
 
-def test_different_version_gives_different_key():
-    assert _key({"cache_version": 1}) != _key({"cache_version": 2})
+def test_distinct_payloads_give_distinct_keys():
+    # cache_key is geometry-params-only (no version); any value difference
+    # in the payload must change the key.
+    assert _key({"sleeper_height": 0.12}) != _key({"sleeper_height": 0.13})
 
 
 def test_init_creates_cache_dir(tmp_path):
     cache_dir = tmp_path / "test_cache"
     assert not cache_dir.exists()
 
-    class _TestCache(SectionCacheBase):
-        CACHE_VERSION = 1
-
-    _TestCache(cache_dir)
+    SectionCacheBase(cache_dir)
     assert cache_dir.exists()
+
+
+def test_init_computes_fingerprint_and_manifest(tmp_path):
+    cache = SectionCacheBase(tmp_path / "c")
+    # No source files -> still a stable 12-char fingerprint, and a manifest.
+    assert len(cache.fingerprint) == 12
+    assert cache.manifest is not None

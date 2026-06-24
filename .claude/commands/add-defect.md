@@ -3,7 +3,7 @@ description: Step-by-step checklist for adding a new railway track defect type t
 ---
 
 ## Current defect types
-!`grep -n "class.*Defect\|ALL_DEFECTS\|CACHE_VERSION" app/geometry/track_defects.py`
+!`grep -rn "class.*Defect\|ALL_DEFECTS" app/geometry/defects/`
 
 ## Checklist
 
@@ -42,9 +42,12 @@ ALL_DEFECTS: List[type[Defect]] = [
 ]
 ```
 
-### 3. Bump the cache version (`app/geometry/track_defects.py`)
+### 3. Cache invalidation (automatic — nothing to do)
 
-Increment `DefectiveSectionCache.CACHE_VERSION` by 1 so stale cached variants are not reused.
+Cache versioning is automatic: the defective cache fingerprints the defect
+source files, so adding/editing a defect module invalidates stale cached
+variants on the next run. There is no `CACHE_VERSION` to bump. (See the
+`bump-cache` skill for details.)
 
 ### 4. Verify available `TrackSection` attributes
 
