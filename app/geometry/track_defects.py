@@ -1,28 +1,29 @@
 """
 Railway track defect implementations and probabilistic selector.
 
-Defects are organized as cached collections where each variant has a fixed
-configuration (e.g., specific skew angle). The DefectSelector probabilistically
-selects which cached defect variant to use for each track section.
+Defects inherit from the abstract Defect base class. Each subclass declares
+its fixed variants and apply() logic. DefectSelector probabilistically picks
+which cached variant to use per track section.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 import random
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
 import bpy
 
 from app.geometry.track_section import TrackSection
+from app.geometry.track_section_cache import SectionCacheBase
 
 
 # ---------------------------------------------------------------------------
-# Concrete defect implementations
+# DefectVariant — pure data carrier for one cached defect configuration
 # ---------------------------------------------------------------------------
 
 
@@ -32,75 +33,95 @@ class DefectVariant:
 
     defect_name: str
     defect_params: dict[str, float | int]
+    defect_class: type = field(hash=False, compare=False)
 
     @property
     def identifier(self) -> str:
         return f"{self.defect_name}:{json.dumps(self.defect_params, sort_keys=True)}"
 
+    def apply(self, section: TrackSection) -> None:
+        self.defect_class.apply(section, self.defect_params)
 
-class SkewedBallastDefect:
-    """
-    Sleeper/ballast rotated by a fixed angle out of perpendicular alignment.
 
-    Uses pre-defined angle variants (2° and 5° clockwise and counterclockwise)
-    rather than random angles, enabling efficient caching.
-    """
+# ---------------------------------------------------------------------------
+# Defect base class
+# ---------------------------------------------------------------------------
 
-    # Fixed angle variants in degrees (positive = clockwise, negative = counter-clockwise)
-    ANGLE_VARIANTS: List[float] = [
-        -5.0,   # 5 degrees counter-clockwise
-        -2.0,   # 2 degrees counter-clockwise
-        2.0,    # 2 degrees clockwise
-        5.0,    # 5 degrees clockwise
-    ]
 
-    @staticmethod
-    def apply_angle(section: TrackSection, angle_deg: float) -> None:
-        """
-        Apply a fixed yaw skew to all three ballast pieces of *section*.
+class Defect(ABC):
+    """Abstract base for all track defect types."""
 
-        Args:
-            section: TrackSection whose ballast will be skewed.
-            angle_deg: Rotation angle in degrees (positive = clockwise).
-        """
-        angle_rad = math.radians(angle_deg)
+    NAME: str
 
-        # Rotate every ballast piece so the whole sleeper looks misaligned.
-        for piece in (section.left_ballast, section.middle_ballast, section.right_ballast):
-            if piece is not None:
-                piece.rotation_euler[2] += angle_rad  # type: ignore
+    @classmethod
+    @abstractmethod
+    def variants(cls) -> List[DefectVariant]:
+        """Return all fixed variants for this defect type."""
+
+    @classmethod
+    @abstractmethod
+    def apply(cls, section: TrackSection, params: dict) -> None:
+        """Apply this defect to *section* using the given *params*."""
+
+
+# ---------------------------------------------------------------------------
+# Concrete defect implementations
+# ---------------------------------------------------------------------------
+
+
+class SkewedBallastDefect(Defect):
+    """Sleeper/ballast rotated by a fixed angle out of perpendicular alignment."""
+
+    NAME = "skewed_ballast"
+    ANGLE_VARIANTS: List[float] = [-5.0, -2.0, 2.0, 5.0]
 
     @classmethod
     def variants(cls) -> List[DefectVariant]:
-        """Return all cached skewed-ballast variants."""
         return [
-            DefectVariant("skewed_ballast", {"angle_deg": angle_deg})
-            for angle_deg in cls.ANGLE_VARIANTS
+            DefectVariant(cls.NAME, {"angle_deg": angle}, cls)
+            for angle in cls.ANGLE_VARIANTS
         ]
 
+    @classmethod
+    def apply(cls, section: TrackSection, params: dict) -> None:
+        angle_rad = math.radians(params.get("angle_deg", 0.0))
+        for piece in (section.left_ballast, section.middle_ballast, section.right_ballast):
+            if piece is not None:
+                piece.rotation_euler[2] += angle_rad
 
-class MissingFastenerPairDefect:
+
+class MissingFastenerPairDefect(Defect):
     """One of the four fastener pairs is missing from the section."""
 
+    NAME = "missing_fastener_pair"
     PAIR_VARIANTS: List[int] = [0, 1, 2, 3]
 
-    @staticmethod
-    def apply_pair(section: TrackSection, pair_index: int) -> None:
-        """Remove one pair of fasteners based on pair creation order."""
+    @classmethod
+    def variants(cls) -> List[DefectVariant]:
+        return [
+            DefectVariant(cls.NAME, {"pair_index": i}, cls)
+            for i in cls.PAIR_VARIANTS
+        ]
+
+    @classmethod
+    def apply(cls, section: TrackSection, params: dict) -> None:
+        pair_index = int(params.get("pair_index", 0))
         start_idx = pair_index * 2
         for idx in sorted((start_idx, start_idx + 1), reverse=True):
             if 0 <= idx < len(section.fasteners):
-                fastener = section.fasteners[idx]
-                bpy.data.objects.remove(fastener, do_unlink=True)
+                bpy.data.objects.remove(section.fasteners[idx], do_unlink=True)
                 section.fasteners.pop(idx)
 
-    @classmethod
-    def variants(cls) -> List[DefectVariant]:
-        """Return all cached missing-fastener-pair variants."""
-        return [
-            DefectVariant("missing_fastener_pair", {"pair_index": pair_index})
-            for pair_index in cls.PAIR_VARIANTS
-        ]
+
+# ---------------------------------------------------------------------------
+# Registry of all known defect types
+# ---------------------------------------------------------------------------
+
+
+ALL_DEFECTS: List[type[Defect]] = [
+    SkewedBallastDefect,
+    MissingFastenerPairDefect,
+]
 
 
 # ---------------------------------------------------------------------------
@@ -108,113 +129,68 @@ class MissingFastenerPairDefect:
 # ---------------------------------------------------------------------------
 
 
-class DefectiveSectionCache:
-    """
-    Loads and stores reusable defective track section prototypes.
-    
-    Unlike the base TrackSectionCache, this caches pre-defected sections
-    (e.g., skewed ballast at specific angles).
-    """
+class DefectiveSectionCache(SectionCacheBase):
+    """Loads and stores reusable defective track section prototypes."""
 
     CACHE_VERSION = 4
 
     def __init__(self, cache_dir: Path | None = None) -> None:
         project_root = Path(__file__).resolve().parents[2]
-        self.cache_dir = cache_dir or project_root / "assets" / "track_section_cache" / "defective"
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        super().__init__(
+            cache_dir or project_root / "assets" / "track_section_cache" / "defective"
+        )
 
     def get_or_create_defective_collection(
         self,
         section: TrackSection,
-        defect_name: str,
-        defect_params: dict,
+        variant: DefectVariant,
     ):
-        """
-        Return a cached defective section collection.
-
-        Args:
-            section: Prototype TrackSection (undefected) geometry template.
-            defect_name: Name of the defect (e.g., "skewed_ballast").
-            defect_params: Dict of parameters (e.g., {"angle_deg": 5.0}).
-
-        Returns:
-            A cached collection containing the defected geometry.
-        """
+        """Return a cached defective section collection for *variant*."""
         payload = {
             "cache_version": self.CACHE_VERSION,
-            "defect_name": defect_name,
+            "defect_name": variant.defect_name,
             **section.geometry_payload(),
-            **defect_params,
+            **variant.defect_params,
         }
         cache_key = self._make_cache_key(payload)
-        collection_name = f"DefectiveSection_{defect_name}_{cache_key}"
+        collection_name = f"DefectiveSection_{variant.defect_name}_{cache_key}"
         cache_path = self.cache_dir / f"{collection_name}.blend"
 
-        existing_collection = bpy.data.collections.get(collection_name)
-        if existing_collection is not None:
+        existing = bpy.data.collections.get(collection_name)
+        if existing is not None:
             print(f"Defective section cache hit (memory): {collection_name}")
-            return existing_collection
+            return existing
 
         if cache_path.exists():
-            loaded_collection = self._load_collection(cache_path, collection_name)
-            if loaded_collection is not None:
+            loaded = self._load_collection(cache_path, collection_name)
+            if loaded is not None:
                 print(f"Defective section cache hit (disk): {cache_path.name}")
-                return loaded_collection
+                return loaded
 
         print(f"Defective section cache miss: building {collection_name}")
-        defective_collection = self._build_collection(
-            collection_name, section, defect_name, defect_params
-        )
-        self._write_collection(cache_path, defective_collection)
+        collection = self._build_collection(collection_name, section, variant)
+        self._write_collection(cache_path, collection)
         print(f"Defective section cache stored: {cache_path}")
-        return defective_collection
+        return collection
 
-    def _build_collection(self, collection_name: str, section: TrackSection, defect_name: str, defect_params: dict):
-        """Build and apply defect to a collection."""
+    def _build_collection(
+        self,
+        collection_name: str,
+        section: TrackSection,
+        variant: DefectVariant,
+    ):
         collection = bpy.data.collections.new(collection_name)
         collection.use_fake_user = True
         section.build(location=(0, 0, 0), target_collection=collection)
-
-        # Apply the defect
-        if defect_name == "skewed_ballast":
-            angle_deg = defect_params.get("angle_deg", 0.0)
-            SkewedBallastDefect.apply_angle(section, angle_deg)
-        elif defect_name == "missing_fastener_pair":
-            pair_index = int(defect_params.get("pair_index", 0))
-            MissingFastenerPairDefect.apply_pair(section, pair_index)
-        else:
-            raise ValueError(f"Unsupported defect type: {defect_name}")
+        variant.apply(section)
 
         collection["cache_version"] = self.CACHE_VERSION
-        collection["defect_name"] = defect_name
-        collection["defect_params"] = json.dumps(defect_params, sort_keys=True)
-        collection["track_section_geometry"] = json.dumps(section.geometry_payload(), sort_keys=True)
+        collection["defect_name"] = variant.defect_name
+        collection["defect_params"] = json.dumps(variant.defect_params, sort_keys=True)
+        collection["track_section_geometry"] = json.dumps(
+            section.geometry_payload(), sort_keys=True
+        )
         return collection
-
-    @staticmethod
-    def _load_collection(cache_path: Path, collection_name: str):
-        with bpy.data.libraries.load(str(cache_path), link=False) as (data_from, data_to):
-            data_to.collections = [collection_name] if collection_name in data_from.collections else []
-
-        if not data_to.collections:
-            return None
-
-        collection = data_to.collections[0]
-        if collection is not None:
-            collection.use_fake_user = True
-        return collection
-
-    @staticmethod
-    def _write_collection(cache_path: Path, collection) -> None:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        bpy.data.libraries.write(str(cache_path), {collection})
-
-    @staticmethod
-    def _make_cache_key(payload: dict) -> str:
-        # Convert all values to strings for consistent hashing
-        hashable_payload = {k: str(v) for k, v in payload.items()}
-        encoded_payload = json.dumps(hashable_payload, sort_keys=True).encode("utf-8")
-        return hashlib.sha256(encoded_payload).hexdigest()[:16]
 
 
 # ---------------------------------------------------------------------------
@@ -227,18 +203,8 @@ class DefectSelector:
     Probabilistic dispatcher that decides whether a track section is defective
     and, if so, which pre-cached defect variant to use.
 
-    Rules
-    -----
-    * ``DEFECT_PROBABILITY`` (10 %) of all sections receive a defect.
-    * All registered defect variants are equally likely within that 10 %.
-    * Defect variants are pre-cached, so rendering is efficient.
-
-    Usage::
-
-        selector = DefectSelector.default(seed=42)
-        variant = selector.select_variant()   # None or DefectVariant
-        if variant is not None:
-            print(variant)
+    * ``DEFECT_PROBABILITY`` (10 %) of sections receive a defect.
+    * All registered variants are equally likely within that 10 %.
     """
 
     DEFECT_PROBABILITY: float = 0.10
@@ -247,53 +213,25 @@ class DefectSelector:
         self._variants: List[DefectVariant] = []
         self._rng: random.Random = random.Random(seed)
 
-    # ------------------------------------------------------------------
-    # Registration
-    # ------------------------------------------------------------------
-
     def register(self, variant: DefectVariant) -> None:
-        """Register one defect variant for equal-probability selection."""
         self._variants.append(variant)
 
-    # ------------------------------------------------------------------
-    # Selection
-    # ------------------------------------------------------------------
-
     def all_variants(self) -> List[DefectVariant]:
-        """Return all registered variants in registration order."""
         return list(self._variants)
 
     def select_variant(self) -> Optional[DefectVariant]:
-        """
-        Roll the dice for the next section.
-
-        Returns:
-            The chosen defect variant when a defect should be applied,
-            or ``None`` for a normal (healthy) section.
-        """
+        """Return a defect variant for the next section, or None for a healthy one."""
         if not self._variants:
             return None
         if self._rng.random() < self.DEFECT_PROBABILITY:
             return self._rng.choice(self._variants)
         return None
 
-    # ------------------------------------------------------------------
-    # Factory
-    # ------------------------------------------------------------------
-
     @classmethod
     def default(cls, seed: Optional[int] = None) -> "DefectSelector":
-        """
-        Create a :class:`DefectSelector` pre-populated with all known defect variants.
-
-        Args:
-            seed: Optional integer seed for reproducible runs.
-        """
+        """Create a DefectSelector pre-populated with all known defect variants."""
         selector = cls(seed=seed)
-        for variant in SkewedBallastDefect.variants():
-            selector.register(variant)
-        for variant in MissingFastenerPairDefect.variants():
-            selector.register(variant)
+        for defect_class in ALL_DEFECTS:
+            for variant in defect_class.variants():
+                selector.register(variant)
         return selector
-
-
