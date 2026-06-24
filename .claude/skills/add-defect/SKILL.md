@@ -14,7 +14,7 @@ Work through these steps in order. Mark each done before moving to the next.
 - Subclass `Defect`
 - Set `NAME: str` — snake_case, unique, used as the cache key
 - Implement `variants()` — return a list of `DefectVariant` objects, one per fixed parameter combination
-- Implement `apply(cls, section, params)` — mutate the `TrackSection` objects (rails, ballast pieces, fasteners) to represent the defect
+- Implement `apply(cls, section, params)` — mutate the `TrackSection` objects /lin(rails, ballast pieces, fasteners) to represent the defect
 
 ```python
 class MyNewDefect(Defect):
