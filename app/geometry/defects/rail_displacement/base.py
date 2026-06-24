@@ -1,0 +1,125 @@
+from __future__ import annotations
+
+import math
+from typing import List
+
+from app.geometry.defects.base import Defect
+from app.geometry.defects.variant import DefectVariant
+from app.geometry.track_section import TrackSection
+
+
+class RailDisplacementDefect(Defect):
+    """
+    Base for sine-arch lateral rail-bend defects.
+
+    Each rail named in ``BENDS`` is sheared along a half-sine arch — zero at both
+    ends of the span, peaking at ``displacement_m`` in the centre — so the bend is
+    continuous across section boundaries. The matching sleeper is translated
+    rigidly (stays straight) and the outer fastener pair follows the rail.
+
+    Subclasses set ``NAME`` and ``BENDS``: a list of ``(side, sign)`` tuples where
+    ``side`` is ``"left"``/``"right"`` and ``sign`` is ``+1`` for +X or ``-1`` for -X.
+    One tuple bends a single rail; two tuples bend both rails at once.
+    """
+
+    DISPLACEMENT_VARIANTS: List[float] = [0.03, 0.06, 0.10]
+    SPAN_LENGTHS: List[int] = [5, 7]
+    BENDS: List[tuple] = []
+
+    # side → (rail attr, sleeper attr, (entry-fastener idx, exit-fastener idx))
+    _SIDE_OBJECTS = {
+        "left":  ("left_rail",  "left_sleeper",  (0, 1)),
+        "right": ("right_rail", "right_sleeper", (6, 7)),
+    }
+
+    @classmethod
+    def variants(cls) -> List[DefectVariant]:
+        return [
+            DefectVariant(
+                cls.NAME,
+                {"displacement_m": d, "span_length": s, "position": p},
+                cls,
+            )
+            for d in cls.DISPLACEMENT_VARIANTS
+            for s in cls.SPAN_LENGTHS
+            for p in range(s)
+        ]
+
+    @classmethod
+    def span_groups(cls) -> List[List[DefectVariant]]:
+        return [
+            [
+                DefectVariant(
+                    cls.NAME,
+                    {"displacement_m": d, "span_length": s, "position": p},
+                    cls,
+                )
+                for p in range(s)
+            ]
+            for d in cls.DISPLACEMENT_VARIANTS
+            for s in cls.SPAN_LENGTHS
+        ]
+
+    @classmethod
+    def apply(cls, section: TrackSection, params: dict) -> None:
+        displacement_m = float(params.get("displacement_m", 0.03))
+        span_length = int(params.get("span_length", 5))
+        position = int(params.get("position", 0))
+        for side, sign in cls.BENDS:
+            cls._displace_rail(
+                section,
+                side=side,
+                sign=sign,
+                displacement_m=displacement_m,
+                span_length=span_length,
+                position=position,
+            )
+
+    @classmethod
+    def _displace_rail(
+        cls, section: TrackSection, *, side: str, sign: int,
+        displacement_m: float, span_length: int, position: int,
+    ) -> None:
+        cfg = section.config
+
+        # Sine arch: section i covers [i/N, (i+1)/N]; adjacent sections share
+        # the same offset at their shared boundary → no discontinuity at joints.
+        t_entry = position / span_length
+        t_exit  = (position + 1) / span_length
+        x_entry = sign * displacement_m * math.sin(math.pi * t_entry)
+        x_exit  = sign * displacement_m * math.sin(math.pi * t_exit)
+
+        rail_attr, sleeper_attr, (entry_idx, exit_idx) = cls._SIDE_OBJECTS[side]
+        rail    = getattr(section, rail_attr, None)
+        sleeper = getattr(section, sleeper_attr, None)
+
+        if rail is not None:
+            cls._bend_mesh_x(rail, x_entry, x_exit)
+
+        # Sleeper translates rigidly by the midpoint offset
+        if sleeper is not None:
+            sleeper.location.x += (x_entry + x_exit) / 2
+
+        # Outer fasteners: interpolate by their y-position within the section
+        pair_offset_y = max(cfg.sleeper_length * 0.24, 0.02)
+        t_near = 0.5 - pair_offset_y / cfg.section_pitch
+        t_far  = 0.5 + pair_offset_y / cfg.section_pitch
+        for idx, t_local in ((entry_idx, t_near), (exit_idx, t_far)):
+            if idx < len(section.fasteners):
+                section.fasteners[idx].location.x += (
+                    x_entry * (1.0 - t_local) + x_exit * t_local
+                )
+
+    @classmethod
+    def _bend_mesh_x(cls, obj, x_entry: float, x_exit: float) -> None:
+        """Linearly shear obj's vertices in X along its local Y axis.
+
+        y=-0.5 (entry face) → x_entry world-X offset; y=+0.5 (exit face) → x_exit.
+        Assumes the object has no rotation (scale-only transform).
+        """
+        scale_x = obj.scale.x
+        for v in obj.data.vertices:
+            t = v.co.y + 0.5
+            dx_world = x_entry * (1.0 - t) + x_exit * t
+            v.co.x += dx_world / scale_x
+        obj.data.update()
