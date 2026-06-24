@@ -61,6 +61,24 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Base camera speed override in Blender units per frame.",
     )
+    parser.add_argument(
+        "--geometry-config",
+        type=str,
+        dest="geometry_config",
+        help=(
+            "Path to a geometry .yml config file (e.g. configs/geometry/default.yml). "
+            "Overrides built-in geometry defaults for rail, sleeper, and fastener dimensions."
+        ),
+    )
+    parser.add_argument(
+        "--force-defect",
+        type=str,
+        dest="force_defect",
+        help=(
+            "Force every section to use this defect type at 100%% probability. "
+            "Useful for smoke tests. E.g. right_rail_lateral_displacement"
+        ),
+    )
     return parser
 
 
@@ -88,6 +106,8 @@ def parse_pipeline_settings(argv: list[str] | None = None) -> PipelineSettings:
         "render_engine": args.render_engine,
         "track_length": args.track_length,
         "base_speed_units_per_frame": args.base_speed_units_per_frame,
+        "geometry_config_path": getattr(args, "geometry_config", None),
+        "force_defect": getattr(args, "force_defect", None),
     }
     filtered_updates = {k: v for k, v in updates.items() if v is not None}
 

@@ -1,0 +1,23 @@
+# tsv-twin track geometry — broad-gauge (1520 mm Russian/Soviet standard)
+# All dimensions in metres.
+
+rail_spacing: 1.520
+
+left_rail:
+  width: 0.07
+  height: 0.16
+  lift: 0.0
+  angle: 0.0
+
+right_rail:
+  width: 0.07
+  height: 0.16
+  lift: 0.0
+  angle: 0.0
+
+sleeper_length: 0.115
+sleeper_height: 0.13
+sleeper_pitch_ratio: 0.62
+
+screw_radius: 0.016
+screw_length: 0.055

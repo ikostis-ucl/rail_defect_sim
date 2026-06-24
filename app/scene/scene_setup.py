@@ -4,6 +4,13 @@ import bpy
 class SceneSetup:
     """Handles high-level scene lifecycle setup."""
 
+    def setup_metric_units(self) -> None:
+        """Set scene unit system to metric with 1 Blender unit = 1 metre."""
+        unit = bpy.context.scene.unit_settings
+        unit.system = "METRIC"
+        unit.scale_length = 1.0
+        unit.length_unit = "METERS"
+
     def cleanup_scene(self) -> None:
         print("Cleaning up scene...")
         bpy.ops.object.select_all(action="SELECT")

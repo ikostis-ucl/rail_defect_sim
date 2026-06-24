@@ -12,7 +12,7 @@ from app.geometry.track_section import TrackSection
 class DefectiveSectionCache(SectionCacheBase):
     """Loads and stores reusable defective track section prototypes."""
 
-    CACHE_VERSION = 4
+    CACHE_VERSION = 7
 
     def __init__(self, cache_dir: Path | None = None) -> None:
         project_root = Path(__file__).resolve().parents[3]

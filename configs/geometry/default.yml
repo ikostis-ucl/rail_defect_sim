@@ -1,0 +1,39 @@
+# tsv-twin track geometry configuration
+# All dimensions are in metres (1 Blender unit = 1 metre).
+#
+# Changing any value here automatically recomputes section_pitch and
+# invalidates the geometry cache — new .blend files are built on next run.
+#
+# Pass this file at runtime with:
+#   blender --background --python run_video_gen.py -- --geometry-config configs/geometry/default.yml
+
+# ── Rail pair ─────────────────────────────────────────────────────────────────
+rail_spacing: 1.435        # centre-to-centre; UIC standard gauge = 1.435 m
+
+# Each rail is configured independently.
+# angle: rotation around the vertical (Z) axis, in degrees.
+#   0 = rail parallel to the track axis (normal: || | ||)
+#   non-zero = rail tilted in the horizontal plane (e.g. 5° gives \\ | ||)
+left_rail:
+  width: 0.06
+  height: 0.16
+  lift: 0.0
+  angle: 0.0
+
+right_rail:
+  width: 0.06
+  height: 0.16
+  lift: 0.0
+  angle: 0.0
+
+# ── Sleeper (the wooden plank sitting under the rails) ────────────────────────
+sleeper_length: 0.108      # body length along the track axis (Y), metres
+sleeper_height: 0.12       # body height (Z), metres
+# Fraction of the centre-to-centre pitch occupied by the sleeper body.
+# section_pitch = sleeper_length / sleeper_pitch_ratio
+# Example: 0.108 / 0.60 = 0.18 m pitch  (6 sleepers per metre of track)
+sleeper_pitch_ratio: 0.60
+
+# ── Fasteners (screws securing rails to sleepers) ─────────────────────────────
+screw_radius: 0.015
+screw_length: 0.05

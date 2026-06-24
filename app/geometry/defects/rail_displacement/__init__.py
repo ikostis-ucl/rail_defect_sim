@@ -1,10 +1,5 @@
-# Canonical location: app/geometry/defects/
-from app.geometry.defects.variant import DefectVariant
-from app.geometry.defects.base import Defect
-from app.geometry.defects.skewed_sleeper import SkewedSleeperDefect
-from app.geometry.defects.missing_fastener import MissingFastenerPairDefect
-from app.geometry.defects.rail_displacement import (
-    RailDisplacementDefect,
+from .base import RailDisplacementDefect
+from .defects import (
     RightRailLateralDisplacementDefect,
     LeftRailLateralDisplacementDefect,
     LeftRailInwardDisplacementDefect,
@@ -14,12 +9,8 @@ from app.geometry.defects.rail_displacement import (
     BothRailsShiftLeftDefect,
     BothRailsShiftRightDefect,
 )
-from app.geometry.defects.registry import ALL_DEFECTS
-from app.geometry.defects.selector import DefectSelector
 
 __all__ = [
-    "DefectVariant", "Defect",
-    "SkewedSleeperDefect", "MissingFastenerPairDefect",
     "RailDisplacementDefect",
     "RightRailLateralDisplacementDefect",
     "LeftRailLateralDisplacementDefect",
@@ -29,5 +20,4 @@ __all__ = [
     "BothRailsGaugeNarrowingDefect",
     "BothRailsShiftLeftDefect",
     "BothRailsShiftRightDefect",
-    "ALL_DEFECTS", "DefectSelector",
 ]
