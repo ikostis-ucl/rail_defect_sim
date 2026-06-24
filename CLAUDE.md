@@ -29,7 +29,7 @@ Use the preset scripts in `runtime/` — pick based on what you need:
 | `final_fullhd.sh` | 1920×1080 | 60 s | Production Full HD |
 | `final_4k.sh` | 3840×2160 | 60 s | Production 4K |
 
-All scripts accept extra `--` args that are forwarded to `config.py` (e.g. `--output-filename my_test.mp4`).
+All scripts accept extra `--` args forwarded to `config.py` (e.g. `--output-filename my_test.mp4`).
 
 Output lands in `data/output/<run_name>/`.
 
@@ -41,20 +41,40 @@ config.py                 CLI arg parsing → PipelineSettings
 app/
   config/settings.py      PipelineSettings frozen dataclass
   core/pipeline.py        RailwayVideoPipeline — orchestrates everything
-  geometry/               track geometry: sections, defects, builder, cache
+  geometry/
+    track_section.py      TrackSection: builds one H-shaped section (rails + ballast + fasteners)
+    track_section_cache.py  SectionCacheBase + TrackSectionCache (healthy prototypes)
+    track_defects.py      Defect system: variants, cache, probabilistic selector
+    track_builder.py      Builds the full track by instantiating cached sections
   camera/                 camera setup and animation
-  materials/              material factory
+  materials/
+    material_factory.py   Material abstract base + concrete types + MaterialFactory coordinator
   render/                 render settings + PNG→MP4 fallback via ffmpeg
   scene/                  scene/world/lighting setup
+assets/
+  track_section_cache/          healthy section prototypes (.blend files)
+  track_section_cache/defective/  defective section prototypes (.blend files)
 ```
 
 `RailwayVideoPipeline.run()` is the single execution path: clean scene → world → render settings → build track → lighting → camera → render → finalize output.
 
+## Defect system
+
+Defects are defined in `track_defects.py` as subclasses of `Defect`. Each declares a fixed set of `DefectVariant`s (pure data) and an `apply()` classmethod that mutates a `TrackSection`.
+
+Current defect types:
+- `SkewedBallastDefect` — ballast rotated ±2° or ±5° out of perpendicular
+- `MissingFastenerPairDefect` — one of four fastener pairs removed
+
+`DefectSelector.default()` probabilistically injects defects: **10% of sections** receive a randomly chosen variant. To add a new defect type, subclass `Defect` and add it to `ALL_DEFECTS`.
+
+## Section caching
+
+The first render builds section prototypes (healthy + one per defect variant) and writes them as `.blend` files under `assets/`. Subsequent renders load from disk. Cache keys are SHA-256 hashes of the geometry payload; bump `CACHE_VERSION` on `TrackSectionCache` or `DefectiveSectionCache` to invalidate stale cache files.
+
 ## Configuration
 
-Settings flow: CLI args (or `TSV_TWIN_*` env vars) → `config.py` → `PipelineSettings` dataclass → passed into pipeline. All settings have defaults in `PipelineSettings`; CLI args only override when explicitly provided.
-
-A config file (yaml/ini/key=value) can be passed with `--config <path>` (requires `configargparse`, which is installed).
+Settings flow: CLI args (or `TSV_TWIN_*` env vars) → `config.py` → `PipelineSettings` dataclass. All settings have defaults; CLI args only override when explicitly provided. A config file (yaml/ini/key=value) can be passed with `--config <path>` (requires `configargparse`, which is installed).
 
 ## Output
 
