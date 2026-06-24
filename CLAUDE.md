@@ -42,9 +42,16 @@ app/
   config/settings.py      PipelineSettings frozen dataclass
   core/pipeline.py        RailwayVideoPipeline — orchestrates everything
   geometry/
-    track_section.py      TrackSection: builds one H-shaped section (rails + ballast + fasteners)
-    track_section_cache.py  SectionCacheBase + TrackSectionCache (healthy prototypes)
-    track_defects.py      Defect system: variants, cache, probabilistic selector
+    track_section.py      TrackSection: builds one H-shaped section (rails + sleepers + fasteners)
+    layout.py / utils.py  geometry helpers TrackSection.build() depends on
+    cache/                section cache package:
+      base.py               SectionCacheBase — shared get-or-create + prune flow
+      fingerprint.py        automatic source-fingerprint versioning (no CACHE_VERSION)
+      manifest.py           CacheManifest — cache_index.json inventory
+      prototype.py          TrackSectionCache (healthy prototypes)
+      defective.py          DefectiveSectionCache (defect variants)
+    track_section_cache.py  thin re-export shim → cache/ (back-compat)
+    defects/              Defect system: variants, registry, probabilistic selector
     track_builder.py      Builds the full track by instantiating cached sections
   camera/                 camera setup and animation
   materials/
@@ -70,7 +77,15 @@ Current defect types:
 
 ## Section caching
 
-The first render builds section prototypes (healthy + one per defect variant) and writes them as `.blend` files under `assets/`. Subsequent renders load from disk. Cache keys are SHA-256 hashes of the geometry payload; bump `CACHE_VERSION` on `TrackSectionCache` or `DefectiveSectionCache` to invalidate stale cache files.
+The first render builds section prototypes (healthy + one per defect variant) and writes them as `.blend` files under `assets/`. Subsequent renders load from disk.
+
+**Cache key** (the 16-char hash in a filename) is a SHA-256 of the geometry payload — it identifies a *geometry configuration* and is stable across code changes.
+
+**Versioning is automatic.** Each cache fingerprints the source files that define its build logic (`SOURCE_PATHS` in `cache/prototype.py` / `cache/defective.py`) via `cache/fingerprint.py`. Editing any of those files changes the fingerprint, which marks every asset built by the old code as stale — there is **no `CACHE_VERSION` integer to bump by hand**. The only manual knob is `CACHE_FORMAT_VERSION` in `cache/fingerprint.py`, bumped *only* for cache-infrastructure/serialisation changes that source hashing can't capture.
+
+**Manifest.** Each cache dir holds a `cache_index.json` (`cache/manifest.py`) recording every asset's key, fingerprint, params, and creation time. On construction each cache **auto-prunes** entries whose fingerprint no longer matches (deleting the stale `.blend`), drops entries whose `.blend` vanished, and logs any unmanaged orphan `.blend` files. Cached collections also embed their provenance as custom properties; on load the embedded fingerprint is re-checked against the manifest, so a `.blend` is self-describing and self-validating.
+
+**Concurrency.** The cache assumes one render process per cache directory (the runtime scripts launch a single `blender --background` each). Two concurrent runs sharing `assets/track_section_cache/` can race on the manifest (last-writer-wins); the worst case is a regenerable `.blend` becoming an orphan and being rebuilt on next access — no corruption or data loss. Don't run parallel renders against the same cache dir without separate `cache_dir`s.
 
 ## Configuration
 
