@@ -13,6 +13,12 @@ from .rail_displacement import (
     BothRailsShiftLeftDefect,
     BothRailsShiftRightDefect,
 )
+from .rail_vertical import (
+    RailVerticalDisplacementDefect,
+    LeftRailVerticalBumpDefect,
+    RightRailVerticalBumpDefect,
+    BothRailsVerticalBumpDefect,
+)
 from .registry import ALL_DEFECTS
 from .selector import DefectSelector
 
@@ -30,6 +36,10 @@ __all__ = [
     "BothRailsGaugeNarrowingDefect",
     "BothRailsShiftLeftDefect",
     "BothRailsShiftRightDefect",
+    "RailVerticalDisplacementDefect",
+    "LeftRailVerticalBumpDefect",
+    "RightRailVerticalBumpDefect",
+    "BothRailsVerticalBumpDefect",
     "ALL_DEFECTS",
     "DefectSelector",
 ]
