@@ -7,7 +7,15 @@ from app.config import PipelineSettings
 
 
 class CameraAnimator:
-    """Creates camera rig and applies movement + vibration animation."""
+    """Creates camera rig and applies movement + vibration animation.
+
+    # TODO: Camera placement configs (height, tilt, lateral offset) are currently
+    # expressed as absolute world-space values. They should be defined relative to
+    # the rail viewport — e.g. height as an offset above the railhead, tilt as an
+    # angle from the rail plane — so that the same config remains valid when track
+    # geometry changes (different rail height, sleeper thickness, gauge). Derive
+    # the absolute pose at setup time from geometry + relative camera spec.
+    """
 
     def __init__(self, settings: PipelineSettings) -> None:
         self.settings = settings
