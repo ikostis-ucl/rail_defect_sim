@@ -8,3 +8,10 @@ dependencies = [
     "configargparse>=1.7.5",
     "tqdm>=4.67.1",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
