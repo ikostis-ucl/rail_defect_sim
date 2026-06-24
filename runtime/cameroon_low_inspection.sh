@@ -11,10 +11,10 @@ exec "$BLENDER_BIN" \
   --python "$PROJECT_ROOT/run_video_gen.py" \
   -- \
   --config "$PROJECT_ROOT/configs/camera/low_inspection.yml" \
-  --fps 24 \
+  --fps 10 \
   --duration-seconds 10 \
-  --resolution-x 640 \
-  --resolution-y 360 \
+  --resolution-x 960 \
+  --resolution-y 540 \
   --render-engine BLENDER_EEVEE \
   --track-length 1000 \
   --base-speed-units-per-frame 0.15 \
