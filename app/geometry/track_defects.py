@@ -140,300 +140,170 @@ class MissingFastenerPairDefect(Defect):
                 section.fasteners.pop(idx)
 
 
-class RightRailLateralDisplacementDefect(Defect):
+class RailDisplacementDefect(Defect):
     """
-    Right rail displaced laterally outward over a span of consecutive sections.
+    Base for sine-arch lateral rail-bend defects.
 
-    The offset profile follows a half-sine arch: zero at both ends of the span,
-    peaking at ``displacement_m`` in the centre.  The outer ballast bed and
-    outer-right fastener pair (indices 6–7) follow the rail so each section
-    looks coherent in isolation.
+    Each rail named in ``BENDS`` is sheared along a half-sine arch — zero at both
+    ends of the span, peaking at ``displacement_m`` in the centre — so the bend is
+    continuous across section boundaries. The matching ballast bed is translated
+    rigidly (sleepers stay straight) and the outer fastener pair follows the rail.
+
+    Subclasses set ``NAME`` and ``BENDS``: a list of ``(side, sign)`` tuples where
+    ``side`` is ``"left"``/``"right"`` and ``sign`` is ``+1`` for a bend toward +X
+    or ``-1`` toward -X. One tuple bends a single rail; two tuples bend both rails
+    at once (shared magnitude, independent direction).
     """
 
-    NAME = "right_rail_lateral_displacement"
     # Peak displacement in metres: mild / moderate / severe
     DISPLACEMENT_VARIANTS: List[float] = [0.03, 0.06, 0.10]
     # Number of consecutive sections the defect spans
     SPAN_LENGTHS: List[int] = [5, 7]
+    # (side, sign) tuples — overridden by subclasses
+    BENDS: List[tuple] = []
+
+    # side → (rail attr, ballast attr, (entry-fastener idx, exit-fastener idx))
+    _SIDE_OBJECTS = {
+        "left": ("left_rail", "left_ballast", (0, 1)),
+        "right": ("right_rail", "right_ballast", (6, 7)),
+    }
 
     @classmethod
     def variants(cls) -> List[DefectVariant]:
         """All (displacement_m, span_length, position) combinations."""
-        result = []
-        for displacement_m in cls.DISPLACEMENT_VARIANTS:
-            for span_length in cls.SPAN_LENGTHS:
-                for position in range(span_length):
-                    result.append(DefectVariant(
-                        cls.NAME,
-                        {
-                            "displacement_m": displacement_m,
-                            "span_length": span_length,
-                            "position": position,
-                        },
-                        cls,
-                    ))
-        return result
+        return [
+            DefectVariant(
+                cls.NAME,
+                {"displacement_m": d, "span_length": s, "position": p},
+                cls,
+            )
+            for d in cls.DISPLACEMENT_VARIANTS
+            for s in cls.SPAN_LENGTHS
+            for p in range(s)
+        ]
 
     @classmethod
     def span_groups(cls) -> List[List[DefectVariant]]:
         """Variants grouped into ordered position sequences, one group per span."""
-        groups = []
-        for displacement_m in cls.DISPLACEMENT_VARIANTS:
-            for span_length in cls.SPAN_LENGTHS:
-                groups.append([
-                    DefectVariant(
-                        cls.NAME,
-                        {
-                            "displacement_m": displacement_m,
-                            "span_length": span_length,
-                            "position": i,
-                        },
-                        cls,
-                    )
-                    for i in range(span_length)
-                ])
-        return groups
+        return [
+            [
+                DefectVariant(
+                    cls.NAME,
+                    {"displacement_m": d, "span_length": s, "position": p},
+                    cls,
+                )
+                for p in range(s)
+            ]
+            for d in cls.DISPLACEMENT_VARIANTS
+            for s in cls.SPAN_LENGTHS
+        ]
 
     @classmethod
     def apply(cls, section: TrackSection, params: dict) -> None:
         displacement_m = float(params.get("displacement_m", 0.03))
         span_length = int(params.get("span_length", 5))
         position = int(params.get("position", 0))
+        for side, sign in cls.BENDS:
+            cls._displace_rail(
+                section,
+                side=side,
+                sign=sign,
+                displacement_m=displacement_m,
+                span_length=span_length,
+                position=position,
+            )
 
-        # Continuous sine along the whole span: t=0 at span start, t=1 at span end.
-        # Each section covers [position/N, (position+1)/N], so adjacent sections
-        # share exactly the same offset at their shared boundary → zero discontinuity.
+    @classmethod
+    def _displace_rail(cls, section, *, side, sign, displacement_m, span_length, position) -> None:
+        # Continuous sine along the whole span: section i covers [i/N, (i+1)/N],
+        # so adjacent sections share the same offset at their boundary → no discontinuity.
         t_entry = position / span_length
         t_exit = (position + 1) / span_length
-        x_entry = displacement_m * math.sin(math.pi * t_entry)
-        x_exit = displacement_m * math.sin(math.pi * t_exit)
+        x_entry = sign * displacement_m * math.sin(math.pi * t_entry)
+        x_exit = sign * displacement_m * math.sin(math.pi * t_exit)
 
-        # Shear the right rail vertices: entry face → x_entry, exit face → x_exit
-        if section.right_rail is not None:
-            cls._bend_mesh_x(section.right_rail, x_entry, x_exit)
+        rail_attr, ballast_attr, (entry_idx, exit_idx) = cls._SIDE_OBJECTS[side]
+        rail = getattr(section, rail_attr)
+        ballast = getattr(section, ballast_attr)
 
-        # Translate right ballast rigidly (sleepers stay straight, not bent)
-        if section.right_ballast is not None:
-            section.right_ballast.location.x += (x_entry + x_exit) / 2
+        # Shear the rail vertices: entry face → x_entry, exit face → x_exit
+        if rail is not None:
+            cls._bend_mesh_x(rail, x_entry, x_exit)
 
-        # Outer-right fasteners (indices 6 & 7) are at ±pair_offset_y from section
-        # centre; interpolate their x-offset from the actual y-position within the section.
+        # Translate the ballast rigidly so the sleeper stays straight (not bent)
+        if ballast is not None:
+            ballast.location.x += (x_entry + x_exit) / 2
+
+        # Outer fasteners sit at ±pair_offset_y from section centre; interpolate
+        # their x-offset from the actual y-position within the section.
         pair_offset_y = max((section.length * section.ballast_length_ratio) * 0.24, 0.02)
-        t6 = 0.5 - pair_offset_y / section.rail_length  # entry-side fastener
-        t7 = 0.5 + pair_offset_y / section.rail_length  # exit-side fastener
-        for idx, t_local in ((6, t6), (7, t7)):
+        t_entry_fast = 0.5 - pair_offset_y / section.rail_length
+        t_exit_fast = 0.5 + pair_offset_y / section.rail_length
+        for idx, t_local in ((entry_idx, t_entry_fast), (exit_idx, t_exit_fast)):
             if idx < len(section.fasteners):
                 section.fasteners[idx].location.x += x_entry * (1.0 - t_local) + x_exit * t_local
 
 
-class LeftRailLateralDisplacementDefect(Defect):
-    """
-    Left rail displaced laterally outward (negative X) over a span of consecutive sections.
+# --- Single-rail bends ------------------------------------------------------
 
-    Symmetric counterpart of RightRailLateralDisplacementDefect. The half-sine
-    arch profile and vertex-shear technique are identical; only the sign of the
-    displacement and the affected objects differ.
-    """
+
+class RightRailLateralDisplacementDefect(RailDisplacementDefect):
+    """Right rail bent outward (+X), widening the gauge on the right."""
+
+    NAME = "right_rail_lateral_displacement"
+    BENDS = [("right", +1)]
+
+
+class LeftRailLateralDisplacementDefect(RailDisplacementDefect):
+    """Left rail bent outward (-X), widening the gauge on the left."""
 
     NAME = "left_rail_lateral_displacement"
-    DISPLACEMENT_VARIANTS: List[float] = [0.03, 0.06, 0.10]
-    SPAN_LENGTHS: List[int] = [5, 7]
-
-    @classmethod
-    def variants(cls) -> List[DefectVariant]:
-        result = []
-        for displacement_m in cls.DISPLACEMENT_VARIANTS:
-            for span_length in cls.SPAN_LENGTHS:
-                for position in range(span_length):
-                    result.append(DefectVariant(
-                        cls.NAME,
-                        {
-                            "displacement_m": displacement_m,
-                            "span_length": span_length,
-                            "position": position,
-                        },
-                        cls,
-                    ))
-        return result
-
-    @classmethod
-    def span_groups(cls) -> List[List[DefectVariant]]:
-        groups = []
-        for displacement_m in cls.DISPLACEMENT_VARIANTS:
-            for span_length in cls.SPAN_LENGTHS:
-                groups.append([
-                    DefectVariant(
-                        cls.NAME,
-                        {
-                            "displacement_m": displacement_m,
-                            "span_length": span_length,
-                            "position": i,
-                        },
-                        cls,
-                    )
-                    for i in range(span_length)
-                ])
-        return groups
-
-    @classmethod
-    def apply(cls, section: TrackSection, params: dict) -> None:
-        displacement_m = float(params.get("displacement_m", 0.03))
-        span_length = int(params.get("span_length", 5))
-        position = int(params.get("position", 0))
-
-        t_entry = position / span_length
-        t_exit = (position + 1) / span_length
-        # Negative: left rail moves in the -X direction
-        x_entry = -displacement_m * math.sin(math.pi * t_entry)
-        x_exit = -displacement_m * math.sin(math.pi * t_exit)
-
-        if section.left_rail is not None:
-            cls._bend_mesh_x(section.left_rail, x_entry, x_exit)
-
-        if section.left_ballast is not None:
-            section.left_ballast.location.x += (x_entry + x_exit) / 2
-
-        # Outer-left fastener pair: indices 0 (entry-side) and 1 (exit-side)
-        pair_offset_y = max((section.length * section.ballast_length_ratio) * 0.24, 0.02)
-        t0 = 0.5 - pair_offset_y / section.rail_length
-        t1 = 0.5 + pair_offset_y / section.rail_length
-        for idx, t_local in ((0, t0), (1, t1)):
-            if idx < len(section.fasteners):
-                section.fasteners[idx].location.x += x_entry * (1.0 - t_local) + x_exit * t_local
+    BENDS = [("left", -1)]
 
 
-class LeftRailInwardDisplacementDefect(Defect):
-    """
-    Left rail displaced laterally inward (positive X, toward track centre).
-
-    Symmetric counterpart of LeftRailLateralDisplacementDefect: same sine-arch
-    profile and vertex-shear technique, but the rail curves toward the centre
-    rather than outward, narrowing the gauge.
-    """
+class LeftRailInwardDisplacementDefect(RailDisplacementDefect):
+    """Left rail bent inward (+X), toward the track centre."""
 
     NAME = "left_rail_inward_displacement"
-    DISPLACEMENT_VARIANTS: List[float] = [0.03, 0.06, 0.10]
-    SPAN_LENGTHS: List[int] = [5, 7]
-
-    @classmethod
-    def variants(cls) -> List[DefectVariant]:
-        result = []
-        for displacement_m in cls.DISPLACEMENT_VARIANTS:
-            for span_length in cls.SPAN_LENGTHS:
-                for position in range(span_length):
-                    result.append(DefectVariant(
-                        cls.NAME,
-                        {"displacement_m": displacement_m, "span_length": span_length, "position": position},
-                        cls,
-                    ))
-        return result
-
-    @classmethod
-    def span_groups(cls) -> List[List[DefectVariant]]:
-        groups = []
-        for displacement_m in cls.DISPLACEMENT_VARIANTS:
-            for span_length in cls.SPAN_LENGTHS:
-                groups.append([
-                    DefectVariant(
-                        cls.NAME,
-                        {"displacement_m": displacement_m, "span_length": span_length, "position": i},
-                        cls,
-                    )
-                    for i in range(span_length)
-                ])
-        return groups
-
-    @classmethod
-    def apply(cls, section: TrackSection, params: dict) -> None:
-        displacement_m = float(params.get("displacement_m", 0.03))
-        span_length = int(params.get("span_length", 5))
-        position = int(params.get("position", 0))
-
-        t_entry = position / span_length
-        t_exit = (position + 1) / span_length
-        # Positive: left rail moves toward the centre (+X)
-        x_entry = displacement_m * math.sin(math.pi * t_entry)
-        x_exit = displacement_m * math.sin(math.pi * t_exit)
-
-        if section.left_rail is not None:
-            cls._bend_mesh_x(section.left_rail, x_entry, x_exit)
-
-        if section.left_ballast is not None:
-            section.left_ballast.location.x += (x_entry + x_exit) / 2
-
-        pair_offset_y = max((section.length * section.ballast_length_ratio) * 0.24, 0.02)
-        t0 = 0.5 - pair_offset_y / section.rail_length
-        t1 = 0.5 + pair_offset_y / section.rail_length
-        for idx, t_local in ((0, t0), (1, t1)):
-            if idx < len(section.fasteners):
-                section.fasteners[idx].location.x += x_entry * (1.0 - t_local) + x_exit * t_local
+    BENDS = [("left", +1)]
 
 
-class RightRailInwardDisplacementDefect(Defect):
-    """
-    Right rail displaced laterally inward (negative X, toward track centre).
-
-    Symmetric counterpart of RightRailLateralDisplacementDefect: same sine-arch
-    profile and vertex-shear technique, but the rail curves toward the centre
-    rather than outward, narrowing the gauge.
-    """
+class RightRailInwardDisplacementDefect(RailDisplacementDefect):
+    """Right rail bent inward (-X), toward the track centre."""
 
     NAME = "right_rail_inward_displacement"
-    DISPLACEMENT_VARIANTS: List[float] = [0.03, 0.06, 0.10]
-    SPAN_LENGTHS: List[int] = [5, 7]
+    BENDS = [("right", -1)]
 
-    @classmethod
-    def variants(cls) -> List[DefectVariant]:
-        result = []
-        for displacement_m in cls.DISPLACEMENT_VARIANTS:
-            for span_length in cls.SPAN_LENGTHS:
-                for position in range(span_length):
-                    result.append(DefectVariant(
-                        cls.NAME,
-                        {"displacement_m": displacement_m, "span_length": span_length, "position": position},
-                        cls,
-                    ))
-        return result
 
-    @classmethod
-    def span_groups(cls) -> List[List[DefectVariant]]:
-        groups = []
-        for displacement_m in cls.DISPLACEMENT_VARIANTS:
-            for span_length in cls.SPAN_LENGTHS:
-                groups.append([
-                    DefectVariant(
-                        cls.NAME,
-                        {"displacement_m": displacement_m, "span_length": span_length, "position": i},
-                        cls,
-                    )
-                    for i in range(span_length)
-                ])
-        return groups
+# --- Both-rail bends (shared magnitude, every direction combination) --------
 
-    @classmethod
-    def apply(cls, section: TrackSection, params: dict) -> None:
-        displacement_m = float(params.get("displacement_m", 0.03))
-        span_length = int(params.get("span_length", 5))
-        position = int(params.get("position", 0))
 
-        t_entry = position / span_length
-        t_exit = (position + 1) / span_length
-        # Negative: right rail moves toward the centre (-X)
-        x_entry = -displacement_m * math.sin(math.pi * t_entry)
-        x_exit = -displacement_m * math.sin(math.pi * t_exit)
+class BothRailsGaugeWideningDefect(RailDisplacementDefect):
+    """Both rails bent outward: gauge widens (left -X, right +X)."""
 
-        if section.right_rail is not None:
-            cls._bend_mesh_x(section.right_rail, x_entry, x_exit)
+    NAME = "both_rails_gauge_widening"
+    BENDS = [("left", -1), ("right", +1)]
 
-        if section.right_ballast is not None:
-            section.right_ballast.location.x += (x_entry + x_exit) / 2
 
-        pair_offset_y = max((section.length * section.ballast_length_ratio) * 0.24, 0.02)
-        t6 = 0.5 - pair_offset_y / section.rail_length
-        t7 = 0.5 + pair_offset_y / section.rail_length
-        for idx, t_local in ((6, t6), (7, t7)):
-            if idx < len(section.fasteners):
-                section.fasteners[idx].location.x += x_entry * (1.0 - t_local) + x_exit * t_local
+class BothRailsGaugeNarrowingDefect(RailDisplacementDefect):
+    """Both rails bent inward: gauge narrows (left +X, right -X)."""
+
+    NAME = "both_rails_gauge_narrowing"
+    BENDS = [("left", +1), ("right", -1)]
+
+
+class BothRailsShiftLeftDefect(RailDisplacementDefect):
+    """Both rails bent toward -X: whole track shifts left (left outward, right inward)."""
+
+    NAME = "both_rails_shift_left"
+    BENDS = [("left", -1), ("right", -1)]
+
+
+class BothRailsShiftRightDefect(RailDisplacementDefect):
+    """Both rails bent toward +X: whole track shifts right (left inward, right outward)."""
+
+    NAME = "both_rails_shift_right"
+    BENDS = [("left", +1), ("right", +1)]
 
 
 # ---------------------------------------------------------------------------
@@ -444,10 +314,16 @@ class RightRailInwardDisplacementDefect(Defect):
 ALL_DEFECTS: List[type[Defect]] = [
     SkewedBallastDefect,
     MissingFastenerPairDefect,
+    # Single-rail bends
     RightRailLateralDisplacementDefect,
     LeftRailLateralDisplacementDefect,
     LeftRailInwardDisplacementDefect,
     RightRailInwardDisplacementDefect,
+    # Both-rail bends (every direction combination)
+    BothRailsGaugeWideningDefect,
+    BothRailsGaugeNarrowingDefect,
+    BothRailsShiftLeftDefect,
+    BothRailsShiftRightDefect,
 ]
 
 
