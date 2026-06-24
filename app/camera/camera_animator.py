@@ -1,4 +1,7 @@
+import math
+
 import bpy
+import mathutils
 
 from app.config import PipelineSettings
 
@@ -9,15 +12,30 @@ class CameraAnimator:
     def __init__(self, settings: PipelineSettings) -> None:
         self.settings = settings
 
-    @staticmethod
-    def setup_camera():
+    def setup_camera(self):
         print("Setting up camera...")
-        # Lower camera altitude so rails/sleepers fill most of the frame.
-        bpy.ops.object.camera_add(location=(0, 0, 2.45), rotation=(0, 0, 0))
+        s = self.settings
+
+        # Compose orientation as a standard yaw → tilt → roll camera rig:
+        #   tilt about X (0 = looking straight down -Z, 90 = looking forward +Y),
+        #   yaw about world Z (pan left/right), roll about the view axis (bank).
+        tilt = math.radians(s.camera_tilt_deg)
+        yaw = math.radians(s.camera_yaw_deg)
+        roll = math.radians(s.camera_roll_deg)
+        rot = (
+            mathutils.Matrix.Rotation(yaw, 4, "Z")
+            @ mathutils.Matrix.Rotation(tilt, 4, "X")
+            @ mathutils.Matrix.Rotation(roll, 4, "Z")
+        )
+
+        bpy.ops.object.camera_add(
+            location=(s.camera_lateral_offset, 0, s.camera_height),
+            rotation=rot.to_euler(),
+        )
         cam = bpy.context.active_object
         bpy.context.scene.camera = cam
         cam.data.type = "PERSP"
-        cam.data.lens = 35
+        cam.data.lens = s.camera_lens
         return cam
 
     def animate(self, camera) -> None:
@@ -56,18 +74,32 @@ class CameraAnimator:
             noise_mod.scale = 100.0
             noise_mod.strength = 5.0
 
+        # Capture the configured base height and tilt, then keyframe them as
+        # constants. The vibration NOISE modifiers below add to the keyframed
+        # value, so they jitter *around* the configured pose instead of
+        # oscillating around zero (which would wipe out height and tilt).
+        base_z = camera.location.z
+        base_rot_x = camera.rotation_euler[0]
+        for frame in (start_frame, total_frames):
+            camera.location.z = base_z
+            camera.keyframe_insert(data_path="location", frame=frame, index=2)
+            camera.rotation_euler[0] = base_rot_x
+            camera.keyframe_insert(data_path="rotation_euler", frame=frame, index=0)
+
         if hasattr(action, "fcurves"):
-            fcurve_z = action.fcurves.new(data_path="location", index=2)
-            fcurve_rot_x = action.fcurves.new(data_path="rotation_euler", index=0)
+            fcurve_z = action.fcurves.find("location", index=2)
+            fcurve_rot_x = action.fcurves.find("rotation_euler", index=0)
         else:
             fcurve_z = action.fcurve_ensure_for_datablock(camera, data_path="location", index=2)
             fcurve_rot_x = action.fcurve_ensure_for_datablock(camera, data_path="rotation_euler", index=0)
 
-        mod_z = fcurve_z.modifiers.new(type="NOISE")
-        mod_z.scale = 2.0
-        mod_z.strength = 0.05
+        if fcurve_z:
+            mod_z = fcurve_z.modifiers.new(type="NOISE")
+            mod_z.scale = 2.0
+            mod_z.strength = 0.05
 
-        mod_rot = fcurve_rot_x.modifiers.new(type="NOISE")
-        mod_rot.scale = 5.0
-        mod_rot.strength = 0.002
+        if fcurve_rot_x:
+            mod_rot = fcurve_rot_x.modifiers.new(type="NOISE")
+            mod_rot.scale = 5.0
+            mod_rot.strength = 0.002
 
