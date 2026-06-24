@@ -1,39 +1,62 @@
-# tsv-twin track geometry configuration
-# All dimensions are in metres (1 Blender unit = 1 metre).
+# tsv-twin track geometry — Camrail (Cameroon) metre-gauge mainline
+# Rail profile: UIC54 (54E1), track gauge: 1000 mm
+# All dimensions are in metres (1 Blender unit = 1 m).
 #
-# Changing any value here automatically recomputes section_pitch and
-# invalidates the geometry cache — new .blend files are built on next run.
+# This is the project default. To override individual values, copy this file
+# and pass it at runtime with:
+#   blender --background --python run_video_gen.py -- \
+#       --geometry-config configs/geometry/my_override.yml
 #
-# Pass this file at runtime with:
-#   blender --background --python run_video_gen.py -- --geometry-config configs/geometry/default.yml
+# To generate a fully coherent config from a gauge and profile in Python:
+#   TrackGeometryConfig.from_gauge(gauge_mm=1000, profile="UIC54")
+#
+# Changing any value here invalidates the geometry cache —
+# new .blend prototypes are built automatically on the next run.
 
 # ── Rail pair ─────────────────────────────────────────────────────────────────
-rail_spacing: 1.435        # centre-to-centre; UIC standard gauge = 1.435 m
 
-# Each rail is configured independently.
-# angle: rotation around the vertical (Z) axis, in degrees.
-#   0 = rail parallel to the track axis (normal: || | ||)
-#   non-zero = rail tilted in the horizontal plane (e.g. 5° gives \\ | ||)
+# Centre-to-centre distance between the two rail centrelines (track gauge).
+# Camrail metre gauge = 1.000 m.
+rail_spacing: 1.000
+
+# Each rail is configured independently, allowing asymmetric defect setups.
 left_rail:
-  width: 0.06
-  height: 0.16
-  lift: 0.0
-  angle: 0.0
+  head_width: 0.070       # rail crown width — visual width of the running surface
+  foot_width: 0.140       # base flange width — drives fastener seat positions
+  height: 0.159           # total rail height from foot bottom to head top
+  pad_thickness: 0.007    # elastomeric pad between rail foot and sleeper surface
+  lift: 0.0               # defect-use only: extra vertical clearance above rail seat
+  angle: 0.0              # defect-use only: horizontal skew in degrees (0 = aligned)
 
 right_rail:
-  width: 0.06
-  height: 0.16
+  head_width: 0.070
+  foot_width: 0.140
+  height: 0.159
+  pad_thickness: 0.007
   lift: 0.0
   angle: 0.0
 
-# ── Sleeper (the wooden plank sitting under the rails) ────────────────────────
-sleeper_length: 0.108      # body length along the track axis (Y), metres
-sleeper_height: 0.12       # body height (Z), metres
-# Fraction of the centre-to-centre pitch occupied by the sleeper body.
-# section_pitch = sleeper_length / sleeper_pitch_ratio
-# Example: 0.108 / 0.60 = 0.18 m pitch  (6 sleepers per metre of track)
-sleeper_pitch_ratio: 0.60
+# ── Sleeper ───────────────────────────────────────────────────────────────────
 
-# ── Fasteners (screws securing rails to sleepers) ─────────────────────────────
-screw_radius: 0.015
-screw_length: 0.05
+# Along-track extent of the sleeper body — its "thickness" as seen from the
+# side of the track (NOT the full ~1400 mm cross-track length).
+# Camrail concrete monoblock: 200 mm.
+sleeper_depth: 0.200
+
+# Vertical dimension of the sleeper body (Z axis).
+sleeper_height: 0.200
+
+# Fraction of the centre-to-centre pitch occupied by the sleeper body.
+# section_pitch = sleeper_depth / sleeper_pitch_ratio
+# Default: 0.200 / 0.320 = 0.625 m  (mid-range of 600–660 mm Camrail standard,
+# yielding 1 600 sleepers/km — within the 1 500–1 666 sleepers/km target)
+sleeper_pitch_ratio: 0.320
+
+# ── Fasteners ─────────────────────────────────────────────────────────────────
+
+# Radius of the elastic spring-steel clip cylinder (clip_diameter / 2).
+# Nabla / Vossloh SKL clip: 13 mm diameter → 6.5 mm radius.
+screw_radius: 0.0065
+
+# Height of the clip above the sleeper surface.
+screw_length: 0.035

@@ -182,9 +182,9 @@ def test_apply_larger_displacement_gives_larger_shift():
 
 
 def test_apply_uses_config_for_fastener_interpolation():
-    # A config with a different sleeper_length changes the fastener t values.
+    # A config with a different sleeper_depth changes the fastener t values.
     # Just ensure it doesn't crash and shifts the fasteners consistently.
-    cfg = TrackGeometryConfig(sleeper_length=0.15, sleeper_pitch_ratio=0.60)
+    cfg = TrackGeometryConfig(sleeper_depth=0.15, sleeper_pitch_ratio=0.60)
     section = _make_section(cfg)
     RightRailLateralDisplacementDefect.apply(section, {
         "displacement_m": 0.06, "span_length": 5, "position": 2,

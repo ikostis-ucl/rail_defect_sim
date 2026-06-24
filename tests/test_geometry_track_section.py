@@ -73,14 +73,14 @@ def test_layout_wider_rail_spacing_gives_wider_middle():
     assert wide._compute_layout(0.0).middle_sleeper_width > narrow._compute_layout(0.0).middle_sleeper_width
 
 
-def test_layout_independent_rail_widths_affect_side_sleepers():
+def test_layout_independent_rail_foot_widths_affect_side_sleepers():
     cfg_sym = TrackGeometryConfig(
-        left_rail=RailConfig(width=0.06),
-        right_rail=RailConfig(width=0.06),
+        left_rail=RailConfig(foot_width=0.140),
+        right_rail=RailConfig(foot_width=0.140),
     )
     cfg_asym = TrackGeometryConfig(
-        left_rail=RailConfig(width=0.06),
-        right_rail=RailConfig(width=0.10),
+        left_rail=RailConfig(foot_width=0.140),
+        right_rail=RailConfig(foot_width=0.180),
     )
     sym_layout = TrackSection(config=cfg_sym)._compute_layout(0.0)
     asym_layout = TrackSection(config=cfg_asym)._compute_layout(0.0)
@@ -140,6 +140,62 @@ def test_rail_center_z_above_sleeper_top():
     rail_cfg = RailConfig(height=0.16)
     ts = _section(sleeper_height=0.12)
     assert ts._rail_center_z(0.0, rail_cfg) > ts._sleeper_top_z(0.0)
+
+
+# ── contiguity ────────────────────────────────────────────────────────────────
+
+def test_rail_foot_bottom_equals_sleeper_top_plus_pad():
+    """Rail foot must rest exactly on the pad; no gap or overlap with sleeper."""
+    pad = 0.007
+    height = 0.159
+    rail_cfg = RailConfig(pad_thickness=pad, height=height)
+    ts = _section(sleeper_height=0.200)
+    sleeper_top = ts._sleeper_top_z(0.0)
+    rail_center = ts._rail_center_z(0.0, rail_cfg)
+    rail_foot_bottom = rail_center - height / 2
+    assert rail_foot_bottom == pytest.approx(sleeper_top + pad)
+
+
+def test_rail_center_z_includes_lift():
+    """lift shifts the rail upward without changing sleeper or pad position."""
+    pad = 0.007
+    height = 0.159
+    lift = 0.05
+    rail_normal = RailConfig(pad_thickness=pad, height=height, lift=0.0)
+    rail_lifted = RailConfig(pad_thickness=pad, height=height, lift=lift)
+    ts = _section(sleeper_height=0.200)
+    diff = ts._rail_center_z(0.0, rail_lifted) - ts._rail_center_z(0.0, rail_normal)
+    assert diff == pytest.approx(lift)
+
+
+def test_fastener_depth_standard_when_no_lift():
+    """With lift=0, fastener uses screw_length unchanged."""
+    ts = TrackSection()
+    cfg = ts.config
+    assert ts._fastener_depth(cfg.left_rail) == pytest.approx(cfg.screw_length)
+
+
+def test_fastener_depth_grows_with_lift():
+    """When lift exceeds screw_length - pad_thickness, fastener must grow."""
+    big_lift = 0.050
+    rail_cfg = RailConfig(pad_thickness=0.007, lift=big_lift)
+    ts = TrackSection()
+    depth = ts._fastener_depth(rail_cfg)
+    # depth must be at least pad_thickness + lift so clip reaches rail foot
+    assert depth >= rail_cfg.pad_thickness + rail_cfg.lift
+
+
+def test_rail_no_overlap_with_sleeper():
+    """Rail foot bottom must not be below the sleeper top surface."""
+    ts = TrackSection()
+    sleeper_top = ts._sleeper_top_z(0.0)
+    for rail_cfg in (ts.config.left_rail, ts.config.right_rail):
+        rail_center = ts._rail_center_z(0.0, rail_cfg)
+        rail_foot_bottom = rail_center - rail_cfg.height / 2
+        assert rail_foot_bottom >= sleeper_top, (
+            f"Rail overlaps sleeper: foot_bottom={rail_foot_bottom:.4f} "
+            f"< sleeper_top={sleeper_top:.4f}"
+        )
 
 
 # ── role constants ────────────────────────────────────────────────────────────

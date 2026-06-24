@@ -1,6 +1,6 @@
 """
 Integration: verify that TrackSection geometry_payload() correctly reflects
-TrackGeometryConfig, and that section_pitch is consistent with sleeper_length
+TrackGeometryConfig, and that section_pitch is consistent with sleeper_depth
 and sleeper_pitch_ratio.
 """
 import dataclasses
@@ -10,7 +10,7 @@ from app.geometry.track_section import TrackSection
 
 
 def test_geometry_payload_matches_config_fields():
-    cfg = TrackGeometryConfig(rail_spacing=1.6, sleeper_length=0.12, sleeper_pitch_ratio=0.65)
+    cfg = TrackGeometryConfig(rail_spacing=1.6, sleeper_depth=0.12, sleeper_pitch_ratio=0.65)
     section = TrackSection(config=cfg)
     payload = section.geometry_payload()
 
@@ -30,10 +30,10 @@ def test_geometry_payload_excludes_section_pitch():
 
 
 def test_section_pitch_consistent_with_payload():
-    cfg = TrackGeometryConfig(sleeper_length=0.13, sleeper_pitch_ratio=0.72)
+    cfg = TrackGeometryConfig(sleeper_depth=0.13, sleeper_pitch_ratio=0.72)
     section = TrackSection(config=cfg)
     payload = section.geometry_payload()
-    derived = payload["sleeper_length"] / payload["sleeper_pitch_ratio"]
+    derived = payload["sleeper_depth"] / payload["sleeper_pitch_ratio"]
     assert derived == pytest.approx(cfg.section_pitch)
 
 

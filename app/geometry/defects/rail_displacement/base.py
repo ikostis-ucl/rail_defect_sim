@@ -101,7 +101,7 @@ class RailDisplacementDefect(Defect):
             sleeper.location.x += (x_entry + x_exit) / 2
 
         # Outer fasteners: interpolate by their y-position within the section
-        pair_offset_y = max(cfg.sleeper_length * 0.24, 0.02)
+        pair_offset_y = max(cfg.sleeper_depth * 0.24, 0.02)
         t_near = 0.5 - pair_offset_y / cfg.section_pitch
         t_far  = 0.5 + pair_offset_y / cfg.section_pitch
         for idx, t_local in ((entry_idx, t_near), (exit_idx, t_far)):

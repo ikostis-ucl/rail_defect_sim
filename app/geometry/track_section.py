@@ -23,7 +23,7 @@ class TrackSection:
 
     All geometry dimensions come from a TrackGeometryConfig.
     section_pitch (the Y span of this section) is derived:
-        section_pitch = config.sleeper_length / config.sleeper_pitch_ratio
+        section_pitch = config.sleeper_depth / config.sleeper_pitch_ratio
     """
 
     SECTION_PARENT_ROLE = "section_parent"
@@ -104,6 +104,7 @@ class TrackSection:
         )
         self.sleeper = self.middle_sleeper
         self.fasteners = self._create_fasteners(parent_location=(x, y, z), collection=target_collection)
+        self.correct_contiguity(z)
         return self.section_parent
 
     # ------------------------------------------------------------------
@@ -116,7 +117,7 @@ class TrackSection:
         bpy.ops.mesh.primitive_cube_add(size=1)
         rail = bpy.context.active_object
         rail.name = "RailPiece"
-        rail.scale = (rail_cfg.width, cfg.section_pitch, rail_cfg.height)
+        rail.scale = (rail_cfg.head_width, cfg.section_pitch, rail_cfg.height)
         rail.location = (x + x_offset, y, self._rail_center_z(z, rail_cfg))
         rail.rotation_euler[2] = math.radians(rail_cfg.angle)
         self._register(rail, role=role, collection=collection,
@@ -129,7 +130,7 @@ class TrackSection:
         bpy.ops.mesh.primitive_cube_add(size=1)
         sleeper = bpy.context.active_object
         sleeper.name = name
-        sleeper.scale = (width, cfg.sleeper_length, cfg.sleeper_height)
+        sleeper.scale = (width, cfg.sleeper_depth, cfg.sleeper_height)
         sleeper.location = (x_pos, y, self._sleeper_center_z(z))
         self._register(sleeper, role=self.SLEEPER_ROLE, collection=collection,
                        parent=self.section_parent, material=self.sleeper_material)
@@ -140,30 +141,37 @@ class TrackSection:
         cfg = self.config
         layout = self._compute_layout(x)
 
-        x_inset = max(cfg.screw_radius * 1.4, 0.01)
-        outer_ratio = 0.65
-        lsw = layout.left_side_sleeper_width
-        rsw = layout.right_side_sleeper_width
-        mw  = layout.middle_sleeper_width
+        lr = cfg.left_rail
+        rr = cfg.right_rail
+        # Each clip is placed at the rail foot edge; cfg.screw_radius keeps it
+        # just inside the foot so it visually grips the flange.
+        clip = cfg.screw_radius
         pair_x_positions = [
-            layout.left_sleeper_x  - lsw / 2 + lsw * outer_ratio,
-            layout.middle_sleeper_x - mw / 2 + x_inset,
-            layout.middle_sleeper_x + mw / 2 - x_inset,
-            layout.right_sleeper_x  + rsw / 2 - rsw * outer_ratio,
+            layout.left_rail_x  - lr.foot_width / 2 + clip,   # outer left clip
+            layout.left_rail_x  + lr.foot_width / 2 - clip,   # inner left clip
+            layout.right_rail_x - rr.foot_width / 2 + clip,   # inner right clip
+            layout.right_rail_x + rr.foot_width / 2 - clip,   # outer right clip
         ]
-        pair_offset_y = max(cfg.sleeper_length * 0.24, 0.02)
-        screw_z = self._sleeper_top_z(z) + cfg.screw_length / 2
+        # Pairs 0 and 1 are on the left rail; pairs 2 and 3 are on the right rail.
+        pair_rail_cfgs = [lr, lr, rr, rr]
 
-        return [
-            self._create_screw(px, sy, screw_z, collection=collection)
-            for px in pair_x_positions
-            for sy in (y - pair_offset_y, y + pair_offset_y)
-        ]
+        pair_offset_y = max(cfg.sleeper_depth * 0.24, 0.02)
+        sleeper_top = self._sleeper_top_z(z)
 
-    def _create_screw(self, x, y, z, *, collection) -> object:
+        fasteners = []
+        for px, rail_cfg in zip(pair_x_positions, pair_rail_cfgs):
+            depth = self._fastener_depth(rail_cfg)
+            screw_z = sleeper_top + depth / 2
+            for sy in (y - pair_offset_y, y + pair_offset_y):
+                fasteners.append(
+                    self._create_screw(px, sy, screw_z, depth=depth, collection=collection)
+                )
+        return fasteners
+
+    def _create_screw(self, x, y, z, *, depth: float, collection) -> object:
         cfg = self.config
         bpy.ops.mesh.primitive_cylinder_add(
-            radius=cfg.screw_radius, depth=cfg.screw_length, location=(x, y, z)
+            radius=cfg.screw_radius, depth=depth, location=(x, y, z)
         )
         screw = bpy.context.active_object
         screw.name = "Fastener"
@@ -183,16 +191,21 @@ class TrackSection:
         left_rail_x  = center_x - cfg.rail_spacing / 2
         right_rail_x = center_x + cfg.rail_spacing / 2
 
-        left_side_sleeper_width  = max(lr.width * 1.2, 0.08) * 2
-        right_side_sleeper_width = max(rr.width * 1.2, 0.08) * 2
+        # Outer sleepers match the rail foot width — the foot is the structural
+        # reference for fastener seats and sleeper extent.
+        left_side_sleeper_width  = lr.foot_width
+        right_side_sleeper_width = rr.foot_width
 
-        middle_edge_left  = left_rail_x  + lr.width / 2
-        middle_edge_right = right_rail_x - rr.width / 2
-        middle_sleeper_width = max(middle_edge_right - middle_edge_left, max(lr.width, rr.width))
+        # Middle sleeper spans the gap between the inner edges of both rail feet.
+        middle_edge_left  = left_rail_x  + lr.foot_width / 2
+        middle_edge_right = right_rail_x - rr.foot_width / 2
+        middle_sleeper_width = max(middle_edge_right - middle_edge_left,
+                                   max(lr.foot_width, rr.foot_width))
         middle_sleeper_x = (middle_edge_left + middle_edge_right) / 2
 
-        left_sleeper_x  = left_rail_x  - lr.width / 2 - left_side_sleeper_width / 2
-        right_sleeper_x = right_rail_x + rr.width / 2 + right_side_sleeper_width / 2
+        # Outer sleepers sit immediately beyond the outer rail foot edge.
+        left_sleeper_x  = left_rail_x  - lr.foot_width / 2 - left_side_sleeper_width / 2
+        right_sleeper_x = right_rail_x + rr.foot_width / 2 + right_side_sleeper_width / 2
 
         return TrackSectionLayout(
             left_sleeper_x=left_sleeper_x,
@@ -224,21 +237,84 @@ class TrackSection:
         return self._sleeper_center_z(base_z) + self.config.sleeper_height / 2
 
     def _rail_center_z(self, base_z: float, rail_cfg: RailConfig) -> float:
+        """Rail foot rests on the elastomeric pad which sits on the sleeper surface.
+
+        Contact chain (bottom → top):
+          sleeper top = base_z + sleeper_height
+          pad top     = sleeper_top + pad_thickness   ← rail foot starts here
+          rail centre = pad_top + height/2 + lift
+        """
         return (
             self._sleeper_top_z(base_z)
+            + rail_cfg.pad_thickness
             + rail_cfg.height / 2
             + rail_cfg.lift
-            - self._rail_drop(rail_cfg)
         )
 
-    def _rail_drop(self, rail_cfg: RailConfig) -> float:
-        """Lower rails slightly so fasteners remain visible in render."""
-        cfg = self.config
-        return min(
-            max(cfg.screw_radius, 0.4 * cfg.screw_length),
-            0.25 * rail_cfg.height,
-            0.25 * cfg.sleeper_height,
+    def _fastener_depth(self, rail_cfg: RailConfig) -> float:
+        """Fastener length that guarantees the clip reaches the rail foot.
+
+        Standard length is used when the rail sits flush on its pad.  When a
+        defect introduces a *lift* gap, the fastener grows to bridge it so the
+        clip stays in contact with the rail flange rather than floating in air.
+
+        The standard dimension is the lower bound; the rendered dimension is
+        always at least pad_thickness + lift so there is no gap.
+        """
+        gap = rail_cfg.pad_thickness + rail_cfg.lift
+        return max(self.config.screw_length, gap)
+
+    # ------------------------------------------------------------------
+    # Contiguity correction
+    # ------------------------------------------------------------------
+
+    def correct_contiguity(self, base_z: float = 0.0) -> None:
+        """Re-apply exact Z positions to guarantee all components are contiguous.
+
+        Call this after build() (already done automatically) and again after
+        any defect.apply() that modifies rail lift or sleeper height.
+
+        Contact chain enforced (Z axis, bottom → top):
+          sleeper bottom  = base_z
+          sleeper top     = base_z + sleeper_height
+          pad top         = sleeper_top + pad_thickness   ← rail foot rests here
+          rail centre     = pad_top + height/2 + lift
+          fastener base   = sleeper_top                   ← clip on sleeper surface
+          fastener top    = sleeper_top + fastener_depth  ← grows to bridge lift gap
+
+        When lift > 0 the fastener scale.z is adjusted so the clip still grips
+        the rail flange instead of leaving empty space.  The standard dimension
+        from the profile is the *initial* value only; correctness takes priority.
+        """
+        sleeper_top = self._sleeper_top_z(base_z)
+
+        for rail_obj, rail_cfg in (
+            (self.left_rail,  self.config.left_rail),
+            (self.right_rail, self.config.right_rail),
+        ):
+            if rail_obj is not None:
+                rail_obj.location.z = (
+                    sleeper_top
+                    + rail_cfg.pad_thickness
+                    + rail_cfg.height / 2
+                    + rail_cfg.lift
+                )
+
+        # Index map (8 fasteners, 4 pairs of 2):
+        #   [0,1] outer-left   → left rail
+        #   [2,3] inner-left   → left rail
+        #   [4,5] inner-right  → right rail
+        #   [6,7] outer-right  → right rail
+        rail_by_fastener = (
+            [self.config.left_rail]  * 4
+            + [self.config.right_rail] * 4
         )
+        nominal = self.config.screw_length
+        for fastener, rail_cfg in zip(self.fasteners, rail_by_fastener):
+            depth = self._fastener_depth(rail_cfg)
+            fastener.location.z = sleeper_top + depth / 2
+            if depth != nominal:
+                fastener.scale.z = depth / nominal
 
     # ------------------------------------------------------------------
     # Material application (for cached collection instances)

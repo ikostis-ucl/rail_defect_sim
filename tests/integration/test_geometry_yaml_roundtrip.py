@@ -11,9 +11,9 @@ from app.config.geometry import RailConfig, TrackGeometryConfig
 def test_roundtrip_all_fields(tmp_path):
     original = TrackGeometryConfig(
         rail_spacing=1.520,
-        left_rail=RailConfig(width=0.07, height=0.18, lift=0.01, angle=2.5),
-        right_rail=RailConfig(width=0.07, height=0.18, lift=0.01, angle=-1.0),
-        sleeper_length=0.115,
+        left_rail=RailConfig(head_width=0.07, height=0.18, lift=0.01, angle=2.5),
+        right_rail=RailConfig(head_width=0.07, height=0.18, lift=0.01, angle=-1.0),
+        sleeper_depth=0.115,
         sleeper_height=0.13,
         sleeper_pitch_ratio=0.62,
         screw_radius=0.016,
@@ -28,14 +28,14 @@ def test_roundtrip_all_fields(tmp_path):
     assert loaded.left_rail.height == pytest.approx(original.left_rail.height)
     assert loaded.left_rail.angle == pytest.approx(original.left_rail.angle)
     assert loaded.right_rail.angle == pytest.approx(original.right_rail.angle)
-    assert loaded.sleeper_length == pytest.approx(original.sleeper_length)
+    assert loaded.sleeper_depth == pytest.approx(original.sleeper_depth)
     assert loaded.sleeper_pitch_ratio == pytest.approx(original.sleeper_pitch_ratio)
     assert loaded.section_pitch == pytest.approx(original.section_pitch)
 
 
 def test_section_pitch_derived_after_yaml_load(tmp_path):
     yml = tmp_path / "geo.yml"
-    yml.write_text("sleeper_length: 0.18\nsleeper_pitch_ratio: 0.72\n")
+    yml.write_text("sleeper_depth: 0.18\nsleeper_pitch_ratio: 0.72\n")
     cfg = TrackGeometryConfig.from_yaml(yml)
     expected_pitch = 0.18 / 0.72
     assert cfg.section_pitch == pytest.approx(expected_pitch, rel=1e-6)
@@ -51,7 +51,7 @@ def test_default_yml_file_is_valid():
     assert cfg.rail_spacing == pytest.approx(defaults.rail_spacing)
     assert cfg.left_rail == defaults.left_rail
     assert cfg.right_rail == defaults.right_rail
-    assert cfg.sleeper_length == pytest.approx(defaults.sleeper_length)
+    assert cfg.sleeper_depth == pytest.approx(defaults.sleeper_depth)
     assert cfg.sleeper_pitch_ratio == pytest.approx(defaults.sleeper_pitch_ratio)
     assert cfg.section_pitch == pytest.approx(defaults.section_pitch)
 
@@ -69,8 +69,8 @@ def test_cache_key_differs_between_configs(tmp_path):
     """Two different configs must produce different cache keys."""
     from app.geometry.cache.base import SectionCacheBase
 
-    cfg_a = TrackGeometryConfig(sleeper_length=0.108)
-    cfg_b = TrackGeometryConfig(sleeper_length=0.130)
+    cfg_a = TrackGeometryConfig(sleeper_depth=0.108)
+    cfg_b = TrackGeometryConfig(sleeper_depth=0.130)
 
     key_a = SectionCacheBase._make_cache_key({"cv": 1, **cfg_a.to_dict()})
     key_b = SectionCacheBase._make_cache_key({"cv": 1, **cfg_b.to_dict()})

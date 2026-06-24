@@ -8,8 +8,10 @@ from app.config.geometry import RailConfig, TrackGeometryConfig
 
 def test_rail_config_defaults():
     rc = RailConfig()
-    assert rc.width == pytest.approx(0.06)
-    assert rc.height == pytest.approx(0.16)
+    assert rc.head_width == pytest.approx(0.070)
+    assert rc.foot_width == pytest.approx(0.140)
+    assert rc.height == pytest.approx(0.159)
+    assert rc.pad_thickness == pytest.approx(0.007)
     assert rc.lift == pytest.approx(0.0)
     assert rc.angle == pytest.approx(0.0)
 
@@ -21,23 +23,24 @@ def test_rail_config_frozen():
 
 
 def test_rail_config_overrides():
-    rc = RailConfig(width=0.08, angle=3.5)
-    assert rc.width == pytest.approx(0.08)
+    rc = RailConfig(head_width=0.08, angle=3.5)
+    assert rc.head_width == pytest.approx(0.08)
     assert rc.angle == pytest.approx(3.5)
-    assert rc.height == pytest.approx(0.16)  # default kept
+    assert rc.height == pytest.approx(0.159)  # default kept
 
 
 # ── TrackGeometryConfig defaults ──────────────────────────────────────────────
 
 def test_default_rail_spacing():
-    assert TrackGeometryConfig().rail_spacing == pytest.approx(1.435)
+    assert TrackGeometryConfig().rail_spacing == pytest.approx(1.000)
 
 
 def test_default_left_rail_is_rail_config():
     cfg = TrackGeometryConfig()
     assert isinstance(cfg.left_rail, RailConfig)
-    assert cfg.left_rail.width == pytest.approx(0.06)
-    assert cfg.left_rail.height == pytest.approx(0.16)
+    assert cfg.left_rail.head_width == pytest.approx(0.070)
+    assert cfg.left_rail.foot_width == pytest.approx(0.140)
+    assert cfg.left_rail.height == pytest.approx(0.159)
     assert cfg.left_rail.lift == pytest.approx(0.0)
     assert cfg.left_rail.angle == pytest.approx(0.0)
 
@@ -53,24 +56,24 @@ def test_default_left_and_right_rail_equal():
     assert cfg.left_rail == cfg.right_rail
 
 
-def test_default_sleeper_length():
-    assert TrackGeometryConfig().sleeper_length == pytest.approx(0.108)
+def test_default_sleeper_depth():
+    assert TrackGeometryConfig().sleeper_depth == pytest.approx(0.200)
 
 
 def test_default_sleeper_height():
-    assert TrackGeometryConfig().sleeper_height == pytest.approx(0.12)
+    assert TrackGeometryConfig().sleeper_height == pytest.approx(0.200)
 
 
 def test_default_sleeper_pitch_ratio():
-    assert TrackGeometryConfig().sleeper_pitch_ratio == pytest.approx(0.60)
+    assert TrackGeometryConfig().sleeper_pitch_ratio == pytest.approx(0.320)
 
 
 def test_default_screw_radius():
-    assert TrackGeometryConfig().screw_radius == pytest.approx(0.015)
+    assert TrackGeometryConfig().screw_radius == pytest.approx(0.0065)
 
 
 def test_default_screw_length():
-    assert TrackGeometryConfig().screw_length == pytest.approx(0.05)
+    assert TrackGeometryConfig().screw_length == pytest.approx(0.035)
 
 
 # ── Independent per-rail angles ───────────────────────────────────────────────
@@ -84,31 +87,30 @@ def test_independent_left_right_rail_angles():
     assert cfg.right_rail.angle == pytest.approx(-3.0)
 
 
-def test_independent_left_right_rail_widths():
+def test_independent_left_right_rail_head_widths():
     cfg = TrackGeometryConfig(
-        left_rail=RailConfig(width=0.06),
-        right_rail=RailConfig(width=0.08),
+        left_rail=RailConfig(head_width=0.065),
+        right_rail=RailConfig(head_width=0.080),
     )
-    assert cfg.left_rail.width == pytest.approx(0.06)
-    assert cfg.right_rail.width == pytest.approx(0.08)
+    assert cfg.left_rail.head_width == pytest.approx(0.065)
+    assert cfg.right_rail.head_width == pytest.approx(0.080)
 
 
 # ── derived section_pitch ──────────────────────────────────────────────────────
 
-def test_section_pitch_default_reproduces_prior_hardcoded_value():
-    # Prior code used section_spacing = 0.18 (hardcoded).
-    # 0.108 / 0.60 = 0.18 exactly — no visual regression.
-    assert TrackGeometryConfig().section_pitch == pytest.approx(0.18)
+def test_section_pitch_default():
+    # Cameroon UIC54: 0.250 / 0.400 = 0.625 m (mid-range of 600–660 mm Camrail standard)
+    assert TrackGeometryConfig().section_pitch == pytest.approx(0.625)
 
 
 def test_section_pitch_formula():
-    cfg = TrackGeometryConfig(sleeper_length=0.13, sleeper_pitch_ratio=0.72)
-    assert cfg.section_pitch == pytest.approx(0.13 / 0.72)
+    cfg = TrackGeometryConfig(sleeper_depth=0.130, sleeper_pitch_ratio=0.72)
+    assert cfg.section_pitch == pytest.approx(0.130 / 0.72)
 
 
-def test_section_pitch_changes_with_sleeper_length():
-    cfg1 = TrackGeometryConfig(sleeper_length=0.10)
-    cfg2 = TrackGeometryConfig(sleeper_length=0.20)
+def test_section_pitch_changes_with_sleeper_depth():
+    cfg1 = TrackGeometryConfig(sleeper_depth=0.10)
+    cfg2 = TrackGeometryConfig(sleeper_depth=0.20)
     assert cfg2.section_pitch > cfg1.section_pitch
 
 
@@ -118,10 +120,10 @@ def test_section_pitch_changes_with_ratio():
     assert cfg_loose.section_pitch > cfg_tight.section_pitch
 
 
-def test_section_pitch_is_always_larger_than_sleeper_length():
+def test_section_pitch_is_always_larger_than_sleeper_depth():
     for ratio in [0.4, 0.6, 0.72, 0.9]:
         cfg = TrackGeometryConfig(sleeper_pitch_ratio=ratio)
-        assert cfg.section_pitch > cfg.sleeper_length
+        assert cfg.section_pitch > cfg.sleeper_depth
 
 
 # ── immutability ──────────────────────────────────────────────────────────────
@@ -142,10 +144,10 @@ def test_to_dict_contains_all_fields():
 
 
 def test_to_dict_values_match():
-    cfg = TrackGeometryConfig(rail_spacing=1.6, sleeper_length=0.12)
+    cfg = TrackGeometryConfig(rail_spacing=1.6, sleeper_depth=0.12)
     d = cfg.to_dict()
     assert d["rail_spacing"] == pytest.approx(1.6)
-    assert d["sleeper_length"] == pytest.approx(0.12)
+    assert d["sleeper_depth"] == pytest.approx(0.12)
 
 
 def test_to_dict_does_not_include_derived_section_pitch():
@@ -179,12 +181,12 @@ def test_from_yaml_full_override(tmp_path):
     yml = tmp_path / "geo.yml"
     yml.write_text(
         "rail_spacing: 1.520\n"
-        "sleeper_length: 0.115\n"
+        "sleeper_depth: 0.115\n"
         "sleeper_pitch_ratio: 0.62\n"
     )
     cfg = TrackGeometryConfig.from_yaml(yml)
     assert cfg.rail_spacing == pytest.approx(1.520)
-    assert cfg.sleeper_length == pytest.approx(0.115)
+    assert cfg.sleeper_depth == pytest.approx(0.115)
     assert cfg.sleeper_pitch_ratio == pytest.approx(0.62)
 
 
@@ -236,12 +238,12 @@ def test_from_yaml_partial_rail_config_keeps_rail_defaults(tmp_path):
     yml.write_text("left_rail:\n  angle: 2.0\n")
     cfg = TrackGeometryConfig.from_yaml(yml)
     assert cfg.left_rail.angle == pytest.approx(2.0)
-    assert cfg.left_rail.width == pytest.approx(RailConfig().width)   # default kept
-    assert cfg.left_rail.height == pytest.approx(RailConfig().height) # default kept
+    assert cfg.left_rail.head_width == pytest.approx(RailConfig().head_width)   # default kept
+    assert cfg.left_rail.height == pytest.approx(RailConfig().height)           # default kept
 
 
 def test_from_yaml_section_pitch_recomputed_after_load(tmp_path):
     yml = tmp_path / "geo.yml"
-    yml.write_text("sleeper_length: 0.12\nsleeper_pitch_ratio: 0.6\n")
+    yml.write_text("sleeper_depth: 0.12\nsleeper_pitch_ratio: 0.6\n")
     cfg = TrackGeometryConfig.from_yaml(yml)
     assert cfg.section_pitch == pytest.approx(0.12 / 0.6)
