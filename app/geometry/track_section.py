@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import math
 from typing import List
 
 import bpy
 
-from app.config.geometry import RailConfig, TrackGeometryConfig
 from app.geometry.layout import TrackSectionLayout
 from app.geometry.utils import move_to_collection, parent_object, replace_material
 
@@ -17,13 +15,9 @@ class TrackSection:
     Represents a single modular section of railway track.
 
     Creates an H-shaped assembly (top view: -- : | : --):
-      - Two parallel rails (left and right, each with its own RailConfig)
+      - Two parallel rails
       - Three-piece sleeper (left outer, middle, right outer)
       - Eight fastener cylinders distributed across the sleeper pieces
-
-    All geometry dimensions come from a TrackGeometryConfig.
-    section_pitch (the Y span of this section) is derived:
-        section_pitch = config.sleeper_length / config.sleeper_pitch_ratio
     """
 
     SECTION_PARENT_ROLE = "section_parent"
@@ -34,15 +28,33 @@ class TrackSection:
 
     def __init__(
         self,
-        config: TrackGeometryConfig | None = None,
         rail_material=None,
         sleeper_material=None,
         fastener_material=None,
+        length: float = 0.15,
+        rail_spacing: float = 1.4,
+        rail_height: float = 0.16,
+        rail_width: float = 0.06,
+        sleeper_height: float = 0.12,
+        rail_lift: float = 0.0,
+        rail_length: float | None = None,
+        sleeper_length_ratio: float = 0.72,
     ):
-        self.config = config if config is not None else TrackGeometryConfig()
         self.rail_material = rail_material
         self.sleeper_material = sleeper_material
         self.fastener_material = fastener_material
+
+        self.length = length
+        self.rail_spacing = rail_spacing
+        self.rail_height = rail_height
+        self.rail_width = rail_width
+        self.sleeper_height = sleeper_height
+        self.rail_lift = rail_lift
+        self.rail_length = rail_length if rail_length is not None else length
+
+        self.screw_radius = 0.015
+        self.screw_length = 0.05
+        self.sleeper_length_ratio = sleeper_length_ratio
 
         self.left_rail = None
         self.right_rail = None
@@ -55,7 +67,6 @@ class TrackSection:
 
     def build(self, location=(0, 0, 0), *, target_collection=None, parent=None) -> object:
         x, y, z = location
-        cfg = self.config
         target_collection = target_collection or bpy.context.scene.collection
 
         bpy.ops.object.empty_add(type="PLAIN_AXES", location=location)
@@ -69,7 +80,7 @@ class TrackSection:
 
         self.left_sleeper = self._create_sleeper_piece(
             x_pos=layout.left_sleeper_x,
-            width=layout.left_side_sleeper_width,
+            width=layout.side_sleeper_width,
             parent_location=(x, y, z),
             collection=target_collection,
             name="SleeperLeft",
@@ -77,7 +88,6 @@ class TrackSection:
         self.left_rail = self._create_rail(
             x_offset=layout.left_rail_x - x,
             parent_location=(x, y, z),
-            rail_cfg=cfg.left_rail,
             role=self.LEFT_RAIL_ROLE,
             collection=target_collection,
         )
@@ -91,13 +101,12 @@ class TrackSection:
         self.right_rail = self._create_rail(
             x_offset=layout.right_rail_x - x,
             parent_location=(x, y, z),
-            rail_cfg=cfg.right_rail,
             role=self.RIGHT_RAIL_ROLE,
             collection=target_collection,
         )
         self.right_sleeper = self._create_sleeper_piece(
             x_pos=layout.right_sleeper_x,
-            width=layout.right_side_sleeper_width,
+            width=layout.side_sleeper_width,
             parent_location=(x, y, z),
             collection=target_collection,
             name="SleeperRight",
@@ -110,26 +119,23 @@ class TrackSection:
     # Component builders
     # ------------------------------------------------------------------
 
-    def _create_rail(self, x_offset, parent_location, *, rail_cfg: RailConfig, role, collection) -> object:
+    def _create_rail(self, x_offset, parent_location, *, role, collection) -> object:
         x, y, z = parent_location
-        cfg = self.config
         bpy.ops.mesh.primitive_cube_add(size=1)
         rail = bpy.context.active_object
         rail.name = "RailPiece"
-        rail.scale = (rail_cfg.width, cfg.section_pitch, rail_cfg.height)
-        rail.location = (x + x_offset, y, self._rail_center_z(z, rail_cfg))
-        rail.rotation_euler[2] = math.radians(rail_cfg.angle)
+        rail.scale = (self.rail_width, self.rail_length, self.rail_height)
+        rail.location = (x + x_offset, y, self._rail_center_z(z))
         self._register(rail, role=role, collection=collection,
                        parent=self.section_parent, material=self.rail_material)
         return rail
 
     def _create_sleeper_piece(self, *, x_pos, width, parent_location, collection, name) -> object:
         _, y, z = parent_location
-        cfg = self.config
         bpy.ops.mesh.primitive_cube_add(size=1)
         sleeper = bpy.context.active_object
         sleeper.name = name
-        sleeper.scale = (width, cfg.sleeper_length, cfg.sleeper_height)
+        sleeper.scale = (width, self.length * self.sleeper_length_ratio, self.sleeper_height)
         sleeper.location = (x_pos, y, self._sleeper_center_z(z))
         self._register(sleeper, role=self.SLEEPER_ROLE, collection=collection,
                        parent=self.section_parent, material=self.sleeper_material)
@@ -137,22 +143,19 @@ class TrackSection:
 
     def _create_fasteners(self, parent_location, *, collection) -> List[object]:
         x, y, z = parent_location
-        cfg = self.config
         layout = self._compute_layout(x)
 
-        x_inset = max(cfg.screw_radius * 1.4, 0.01)
+        x_inset = max(self.screw_radius * 1.4, 0.01)
         outer_ratio = 0.65
-        lsw = layout.left_side_sleeper_width
-        rsw = layout.right_side_sleeper_width
-        mw  = layout.middle_sleeper_width
+        sw, mw = layout.side_sleeper_width, layout.middle_sleeper_width
         pair_x_positions = [
-            layout.left_sleeper_x  - lsw / 2 + lsw * outer_ratio,
+            layout.left_sleeper_x  - sw / 2 + sw * outer_ratio,
             layout.middle_sleeper_x - mw / 2 + x_inset,
             layout.middle_sleeper_x + mw / 2 - x_inset,
-            layout.right_sleeper_x  + rsw / 2 - rsw * outer_ratio,
+            layout.right_sleeper_x  + sw / 2 - sw * outer_ratio,
         ]
-        pair_offset_y = max(cfg.sleeper_length * 0.24, 0.02)
-        screw_z = self._sleeper_top_z(z) + cfg.screw_length / 2
+        pair_offset_y = max((self.length * self.sleeper_length_ratio) * 0.24, 0.02)
+        screw_z = self._sleeper_top_z(z) + self.screw_length / 2
 
         return [
             self._create_screw(px, sy, screw_z, collection=collection)
@@ -161,9 +164,8 @@ class TrackSection:
         ]
 
     def _create_screw(self, x, y, z, *, collection) -> object:
-        cfg = self.config
         bpy.ops.mesh.primitive_cylinder_add(
-            radius=cfg.screw_radius, depth=cfg.screw_length, location=(x, y, z)
+            radius=self.screw_radius, depth=self.screw_length, location=(x, y, z)
         )
         screw = bpy.context.active_object
         screw.name = "Fastener"
@@ -176,23 +178,18 @@ class TrackSection:
     # ------------------------------------------------------------------
 
     def _compute_layout(self, center_x: float) -> TrackSectionLayout:
-        cfg = self.config
-        lr = cfg.left_rail
-        rr = cfg.right_rail
+        left_rail_x  = center_x - self.rail_spacing / 2
+        right_rail_x = center_x + self.rail_spacing / 2
 
-        left_rail_x  = center_x - cfg.rail_spacing / 2
-        right_rail_x = center_x + cfg.rail_spacing / 2
+        side_sleeper_width = max(self.rail_width * 1.2, 0.08) * 2
 
-        left_side_sleeper_width  = max(lr.width * 1.2, 0.08) * 2
-        right_side_sleeper_width = max(rr.width * 1.2, 0.08) * 2
-
-        middle_edge_left  = left_rail_x  + lr.width / 2
-        middle_edge_right = right_rail_x - rr.width / 2
-        middle_sleeper_width = max(middle_edge_right - middle_edge_left, max(lr.width, rr.width))
+        middle_edge_left  = left_rail_x  + self.rail_width / 2
+        middle_edge_right = right_rail_x - self.rail_width / 2
+        middle_sleeper_width = max(middle_edge_right - middle_edge_left, self.rail_width)
         middle_sleeper_x = (middle_edge_left + middle_edge_right) / 2
 
-        left_sleeper_x  = left_rail_x  - lr.width / 2 - left_side_sleeper_width / 2
-        right_sleeper_x = right_rail_x + rr.width / 2 + right_side_sleeper_width / 2
+        left_sleeper_x  = left_rail_x  - self.rail_width / 2 - side_sleeper_width / 2
+        right_sleeper_x = right_rail_x + self.rail_width / 2 + side_sleeper_width / 2
 
         return TrackSectionLayout(
             left_sleeper_x=left_sleeper_x,
@@ -201,43 +198,46 @@ class TrackSection:
             middle_sleeper_width=middle_sleeper_width,
             right_rail_x=right_rail_x,
             right_sleeper_x=right_sleeper_x,
-            left_side_sleeper_width=left_side_sleeper_width,
-            right_side_sleeper_width=right_side_sleeper_width,
+            side_sleeper_width=side_sleeper_width,
         )
 
     # ------------------------------------------------------------------
-    # Geometry serialisation (used by cache key computation)
+    # Geometry serialisation
     # ------------------------------------------------------------------
 
-    def geometry_payload(self) -> dict:
-        """Return all geometry parameters as a plain dict for cache hashing."""
-        return self.config.to_dict()
+    def geometry_payload(self) -> dict[str, float]:
+        return {
+            "length": self.length,
+            "rail_spacing": self.rail_spacing,
+            "rail_height": self.rail_height,
+            "rail_width": self.rail_width,
+            "sleeper_height": self.sleeper_height,
+            "rail_lift": self.rail_lift,
+            "rail_length": self.rail_length,
+            "sleeper_length_ratio": self.sleeper_length_ratio,
+            "screw_radius": self.screw_radius,
+            "screw_length": self.screw_length,
+        }
 
     # ------------------------------------------------------------------
     # Z-axis helpers
     # ------------------------------------------------------------------
 
     def _sleeper_center_z(self, base_z: float) -> float:
-        return base_z + self.config.sleeper_height / 2
+        return base_z + self.sleeper_height / 2
 
     def _sleeper_top_z(self, base_z: float) -> float:
-        return self._sleeper_center_z(base_z) + self.config.sleeper_height / 2
+        return self._sleeper_center_z(base_z) + self.sleeper_height / 2
 
-    def _rail_center_z(self, base_z: float, rail_cfg: RailConfig) -> float:
-        return (
-            self._sleeper_top_z(base_z)
-            + rail_cfg.height / 2
-            + rail_cfg.lift
-            - self._rail_drop(rail_cfg)
-        )
+    def _rail_center_z(self, base_z: float) -> float:
+        return self._sleeper_top_z(base_z) + self.rail_height / 2 + self.rail_lift - self._rail_drop()
 
-    def _rail_drop(self, rail_cfg: RailConfig) -> float:
+    def _rail_drop(self) -> float:
         """Lower rails slightly so fasteners remain visible in render."""
-        cfg = self.config
         return min(
-            max(cfg.screw_radius, 0.4 * cfg.screw_length),
-            0.25 * rail_cfg.height,
-            0.25 * cfg.sleeper_height,
+            max(self.screw_radius, 0.4 * self.screw_length),
+            0.25 * self.rail_height,
+            0.25 * self.sleeper_height,
         )
 
     # ------------------------------------------------------------------

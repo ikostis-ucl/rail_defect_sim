@@ -41,7 +41,6 @@ class SectionCacheBase:
 
     @staticmethod
     def _make_cache_key(payload: dict) -> str:
-        # json.dumps with sort_keys=True is recursive — handles nested dicts from RailConfig.
-        # default=str catches any non-serialisable stragglers without silently breaking.
-        encoded = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+        hashable = {k: str(v) for k, v in payload.items()}
+        encoded = json.dumps(hashable, sort_keys=True).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()[:16]

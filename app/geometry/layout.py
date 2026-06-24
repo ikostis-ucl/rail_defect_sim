@@ -11,5 +11,4 @@ class TrackSectionLayout:
     middle_sleeper_width: float
     right_rail_x: float
     right_sleeper_x: float
-    left_side_sleeper_width: float
-    right_side_sleeper_width: float
+    side_sleeper_width: float
