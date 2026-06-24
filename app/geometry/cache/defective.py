@@ -30,6 +30,7 @@ class DefectiveSectionCache(SectionCacheBase):
 
     KIND = "defective"
     SOURCE_PATHS = _SOURCE_FILES
+    CACHE_VERSION = 8
 
     def __init__(self, cache_dir: Path | None = None, *, auto_prune: bool = True) -> None:
         project_root = Path(__file__).resolve().parents[3]

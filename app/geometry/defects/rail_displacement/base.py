@@ -94,7 +94,7 @@ class RailDisplacementDefect(Defect):
         sleeper = getattr(section, sleeper_attr, None)
 
         if rail is not None:
-            cls._bend_mesh_x(rail, x_entry, x_exit)
+            cls._bend_mesh(rail, x_entry, x_exit, axis="x")
 
         # Sleeper translates rigidly by the midpoint offset
         if sleeper is not None:
@@ -111,15 +111,18 @@ class RailDisplacementDefect(Defect):
                 )
 
     @classmethod
-    def _bend_mesh_x(cls, obj, x_entry: float, x_exit: float) -> None:
-        """Linearly shear obj's vertices in X along its local Y axis.
+    def _bend_mesh(cls, obj, entry: float, exit: float, axis: str = "x") -> None:
+        """Linearly shear obj's vertices along *axis* as a function of local Y.
 
-        y=-0.5 (entry face) → x_entry world-X offset; y=+0.5 (exit face) → x_exit.
-        Assumes the object has no rotation (scale-only transform).
+        y=-0.5 (entry face) → *entry* world offset; y=+0.5 (exit face) → *exit*.
+        Intermediate vertices are interpolated, producing a continuous bend.
+        Assumes the object has no rotation (scale-only transform), so world axis
+        i maps to local axis i.
         """
-        scale_x = obj.scale.x
+        i = {"x": 0, "y": 1, "z": 2}[axis]
+        scale = obj.scale[i]
         for v in obj.data.vertices:
             t = v.co.y + 0.5
-            dx_world = x_entry * (1.0 - t) + x_exit * t
-            v.co.x += dx_world / scale_x
+            delta_world = entry * (1.0 - t) + exit * t
+            v.co[i] += delta_world / scale
         obj.data.update()

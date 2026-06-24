@@ -15,6 +15,11 @@ from app.geometry.defects.rail_displacement import (
     BothRailsShiftLeftDefect,
     BothRailsShiftRightDefect,
 )
+from app.geometry.defects.rail_vertical import (
+    LeftRailVerticalBumpDefect,
+    RightRailVerticalBumpDefect,
+    BothRailsVerticalBumpDefect,
+)
 
 ALL_DEFECTS: List[type[Defect]] = [
     SkewedSleeperDefect,
@@ -29,4 +34,8 @@ ALL_DEFECTS: List[type[Defect]] = [
     BothRailsGaugeNarrowingDefect,
     BothRailsShiftLeftDefect,
     BothRailsShiftRightDefect,
+    # Vertical rail bumps (rail lifts off its seat)
+    LeftRailVerticalBumpDefect,
+    RightRailVerticalBumpDefect,
+    BothRailsVerticalBumpDefect,
 ]

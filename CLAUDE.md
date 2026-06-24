@@ -83,8 +83,11 @@ Current defect types (the string is the `NAME`, used as the cache key and to for
 | `both_rails_gauge_narrowing` | `BothRailsGaugeNarrowingDefect` | both rails bend together (gauge narrows) |
 | `both_rails_shift_left` | `BothRailsShiftLeftDefect` | whole track bends left |
 | `both_rails_shift_right` | `BothRailsShiftRightDefect` | whole track bends right |
+| `left_rail_vertical_bump` | `LeftRailVerticalBumpDefect` | left rail bumps upward (lifts off sleeper) |
+| `right_rail_vertical_bump` | `RightRailVerticalBumpDefect` | right rail bumps upward (lifts off sleeper) |
+| `both_rails_vertical_bump` | `BothRailsVerticalBumpDefect` | both rails bump upward together |
 
-The rail-displacement defects share a `RailDisplacementDefect` base (`rail_displacement.py`): the rail mesh is sheared along a half-sine arch over a **span** of consecutive sections (5 or 7) so the bend is continuous; the sleeper is translated rigidly (stays straight) and the outer fastener pair follows. A `(side, sign)` `BENDS` list drives which rail(s) bend and in which direction — one tuple = single rail, two tuples = both rails. Magnitude variants: 3 cm / 6 cm / 10 cm.
+The rail-displacement defects share a `RailDisplacementDefect` base (`rail_displacement/base.py`): the rail mesh is sheared along a half-sine arch over a **span** of consecutive sections (5 or 7) so the bend is continuous; the sleeper is translated rigidly (stays straight) and the outer fastener pair follows. A `(side, sign)` `BENDS` list drives which rail(s) bend and in which direction — one tuple = single rail, two tuples = both rails. Magnitude variants: 3 cm / 6 cm / 10 cm. The shear helper `_bend_mesh(obj, entry, exit, axis)` takes the target axis, so the **vertical bump** defects (`rail_vertical/`) reuse the same machinery, bending in **+Z** instead of X — there the rail lifts off its seat (sleeper stays put) while the fasteners follow upward.
 
 `DefectSelector.default()` probabilistically injects defects: **10% of sections** *start* a defect (`DEFECT_PROBABILITY`); multi-section spans then queue their follower positions automatically. To add a new defect type, subclass `Defect` (or `RailDisplacementDefect`) and add it to `ALL_DEFECTS` in `registry.py` — the defective cache invalidates automatically (it fingerprints the `defects/` sources; see Section caching).
 
