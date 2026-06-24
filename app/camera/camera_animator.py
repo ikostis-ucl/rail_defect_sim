@@ -48,7 +48,7 @@ class CameraAnimator:
         fps = self.settings.fps
         start_frame = self.settings.start_frame
         total_frames = self.settings.total_frames
-        accel_duration = 10 * fps
+        accel_duration = self.settings.camera_accel_seconds * fps
 
         camera.location.y = 0
         camera.keyframe_insert(data_path="location", frame=start_frame, index=1)
@@ -67,8 +67,13 @@ class CameraAnimator:
         if fcurve_y:
             fcurve_y.extrapolation = "LINEAR"
             key_start = fcurve_y.keyframe_points[0]
-            key_start.interpolation = "BEZIER"
-            key_start.handle_right = (start_frame + accel_duration, 0)
+            if accel_duration > 0:
+                # Ease-in: start slow, ramp up to cruising speed over accel_duration.
+                key_start.interpolation = "BEZIER"
+                key_start.handle_right = (start_frame + accel_duration, 0)
+            else:
+                # No acceleration: constant velocity across the whole clip.
+                key_start.interpolation = "LINEAR"
 
             noise_mod = fcurve_y.modifiers.new(type="NOISE")
             noise_mod.scale = 100.0

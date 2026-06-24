@@ -1,0 +1,17 @@
+# tsv-twin camera placement — LOW INSPECTION (rail level)
+#
+# Dramatic low, rail-level view looking forward down the track — as if a camera
+# rode just above the railhead on an inspection bogie. The wide lens exaggerates
+# the rails rushing past and makes defects in the near field very prominent.
+#
+# Pass at runtime with:
+#   blender --background --python run_video_gen.py -- --config configs/camera/low_inspection.yml
+#
+# Angles in degrees. Distances in metres. tilt: 0 = down, 90 = horizontal forward.
+
+camera-height: 0.6           # just above the railhead
+camera-lateral-offset: 0.0   # centred between the rails
+camera-tilt-deg: 85.0        # looking forward, slightly down
+camera-yaw-deg: 0.0
+camera-roll-deg: 0.0
+camera-lens: 28              # wide angle — dramatic, exaggerated perspective

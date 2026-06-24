@@ -109,6 +109,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         help="Camera focal length in mm (lower = wider FOV). Default 35.",
     )
+    parser.add_argument(
+        "--camera-accel-seconds",
+        type=float,
+        help="Ease-in ramp length in seconds before reaching cruising speed. "
+             "0 = constant velocity (no acceleration). Default 10.",
+    )
     return parser
 
 
@@ -144,6 +150,7 @@ def parse_pipeline_settings(argv: list[str] | None = None) -> PipelineSettings:
         "camera_yaw_deg": args.camera_yaw_deg,
         "camera_roll_deg": args.camera_roll_deg,
         "camera_lens": args.camera_lens,
+        "camera_accel_seconds": args.camera_accel_seconds,
     }
     filtered_updates = {k: v for k, v in updates.items() if v is not None}
 

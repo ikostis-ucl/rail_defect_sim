@@ -1,0 +1,18 @@
+# tsv-twin camera placement — WINDSHIELD (engine cab)
+#
+# Simulates a camera mounted on the windshield of the leading engine, looking
+# down the track in the direction of travel. Centred on the track, at cab
+# height, tilted just below the horizontal so the rails ahead stay in frame and
+# converge toward the vanishing point — a driver's-eye view.
+#
+# Pass at runtime with:
+#   blender --background --python run_video_gen.py -- --config configs/camera/windshield.yml
+#
+# Angles in degrees. Distances in metres. tilt: 0 = down, 90 = horizontal forward.
+
+camera-height: 3.0           # ~cab height above the rail
+camera-lateral-offset: 0.0   # centred on the track
+camera-tilt-deg: 84.0        # looking forward, slightly down onto the track
+camera-yaw-deg: 0.0          # straight ahead
+camera-roll-deg: 0.0
+camera-lens: 35              # natural ~50mm-equivalent perspective

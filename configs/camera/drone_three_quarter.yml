@@ -1,0 +1,17 @@
+# tsv-twin camera placement — DRONE THREE-QUARTER
+#
+# High, angled survey view — like a drone following the train from above and
+# behind. Sees both rails plus the surrounding ballast/ground, with enough tilt
+# to read the track layout and the terrain context at once.
+#
+# Pass at runtime with:
+#   blender --background --python run_video_gen.py -- --config configs/camera/drone_three_quarter.yml
+#
+# Angles in degrees. Distances in metres. tilt: 0 = down, 90 = horizontal forward.
+
+camera-height: 6.0           # well above the track
+camera-lateral-offset: 0.0   # centred (raise camera-lateral-offset for an oblique side view)
+camera-tilt-deg: 35.0        # angled down — three-quarter aerial
+camera-yaw-deg: 0.0
+camera-roll-deg: 0.0
+camera-lens: 35

@@ -34,6 +34,7 @@ class PipelineSettings:
     camera_yaw_deg: float = 0.0            # pan about vertical axis (turn left/right)
     camera_roll_deg: float = 0.0           # bank about the view axis
     camera_lens: float = 35.0              # focal length in mm (lower = wider FOV)
+    camera_accel_seconds: float = 10.0     # ease-in ramp length; 0 = constant velocity (no acceleration)
 
     @property
     def total_frames(self) -> int:

@@ -1,0 +1,17 @@
+# tsv-twin camera placement — ROOF / LOOKING FAR
+#
+# Camera on top of the wagon, looking far ahead toward the horizon. Higher than
+# the windshield view and tilted closer to horizontal, with a longer lens to
+# compress distance and emphasise the track receding into the distance.
+#
+# Pass at runtime with:
+#   blender --background --python run_video_gen.py -- --config configs/camera/roof_far.yml
+#
+# Angles in degrees. Distances in metres. tilt: 0 = down, 90 = horizontal forward.
+
+camera-height: 4.5           # wagon-roof height
+camera-lateral-offset: 0.0   # centred on the track
+camera-tilt-deg: 88.0        # nearly horizontal, gazing toward the horizon
+camera-yaw-deg: 0.0
+camera-roll-deg: 0.0
+camera-lens: 50              # mild telephoto — compresses the long view

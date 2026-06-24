@@ -1,0 +1,18 @@
+# tsv-twin camera placement — BIRD'S EYE (top-down)
+#
+# The original default view: camera high above the track centre looking
+# straight down. Best for inspecting geometry, gauge, and sleeper alignment.
+#
+# Pass at runtime with:
+#   blender --background --python run_video_gen.py -- --config configs/camera/birds_eye.yml
+# (CLI flags override individual keys, e.g. ... --config ... --camera-height 3)
+#
+# Angles in degrees. Distances in metres (1 Blender unit = 1 m).
+# tilt: 0 = straight down (bird's eye), 90 = looking horizontally forward.
+
+camera-height: 2.45          # Z above the track
+camera-lateral-offset: 0.0   # X; 0 = centred over the track
+camera-tilt-deg: 0.0         # straight down
+camera-yaw-deg: 0.0          # no pan
+camera-roll-deg: 0.0         # no bank
+camera-lens: 35              # focal length (mm)
