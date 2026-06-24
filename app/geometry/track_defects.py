@@ -74,6 +74,22 @@ class Defect(ABC):
         """
         return [[v] for v in cls.variants()]
 
+    @classmethod
+    def _bend_mesh_x(cls, obj, x_entry: float, x_exit: float) -> None:
+        """
+        Linearly shear *obj*'s vertices in X along its local Y axis.
+
+        Vertices at local y = -0.5 (entry face) shift by *x_entry* in world X;
+        vertices at local y = +0.5 (exit face) shift by *x_exit*. Intermediate
+        vertices are interpolated. Assumes obj has no rotation (scale-only transform).
+        """
+        scale_x = obj.scale.x
+        for v in obj.data.vertices:
+            t = v.co.y + 0.5          # 0.0 at entry face, 1.0 at exit face
+            dx_world = x_entry * (1.0 - t) + x_exit * t
+            v.co.x += dx_world / scale_x
+        obj.data.update()
+
 
 # ---------------------------------------------------------------------------
 # Concrete defect implementations
@@ -209,21 +225,81 @@ class RightRailLateralDisplacementDefect(Defect):
             if idx < len(section.fasteners):
                 section.fasteners[idx].location.x += x_entry * (1.0 - t_local) + x_exit * t_local
 
-    @classmethod
-    def _bend_mesh_x(cls, obj, x_entry: float, x_exit: float) -> None:
-        """
-        Linearly shear *obj*'s vertices in X along its local Y axis.
 
-        Vertices at local y = -0.5 (entry face) are shifted by *x_entry* in world X;
-        vertices at local y = +0.5 (exit face) by *x_exit*. Intermediate vertices
-        are interpolated. Assumes obj has no rotation (scale-only transform).
-        """
-        scale_x = obj.scale.x
-        for v in obj.data.vertices:
-            t = v.co.y + 0.5          # 0.0 at entry face, 1.0 at exit face
-            dx_world = x_entry * (1.0 - t) + x_exit * t
-            v.co.x += dx_world / scale_x
-        obj.data.update()
+class LeftRailLateralDisplacementDefect(Defect):
+    """
+    Left rail displaced laterally outward (negative X) over a span of consecutive sections.
+
+    Symmetric counterpart of RightRailLateralDisplacementDefect. The half-sine
+    arch profile and vertex-shear technique are identical; only the sign of the
+    displacement and the affected objects differ.
+    """
+
+    NAME = "left_rail_lateral_displacement"
+    DISPLACEMENT_VARIANTS: List[float] = [0.03, 0.06, 0.10]
+    SPAN_LENGTHS: List[int] = [5, 7]
+
+    @classmethod
+    def variants(cls) -> List[DefectVariant]:
+        result = []
+        for displacement_m in cls.DISPLACEMENT_VARIANTS:
+            for span_length in cls.SPAN_LENGTHS:
+                for position in range(span_length):
+                    result.append(DefectVariant(
+                        cls.NAME,
+                        {
+                            "displacement_m": displacement_m,
+                            "span_length": span_length,
+                            "position": position,
+                        },
+                        cls,
+                    ))
+        return result
+
+    @classmethod
+    def span_groups(cls) -> List[List[DefectVariant]]:
+        groups = []
+        for displacement_m in cls.DISPLACEMENT_VARIANTS:
+            for span_length in cls.SPAN_LENGTHS:
+                groups.append([
+                    DefectVariant(
+                        cls.NAME,
+                        {
+                            "displacement_m": displacement_m,
+                            "span_length": span_length,
+                            "position": i,
+                        },
+                        cls,
+                    )
+                    for i in range(span_length)
+                ])
+        return groups
+
+    @classmethod
+    def apply(cls, section: TrackSection, params: dict) -> None:
+        displacement_m = float(params.get("displacement_m", 0.03))
+        span_length = int(params.get("span_length", 5))
+        position = int(params.get("position", 0))
+
+        t_entry = position / span_length
+        t_exit = (position + 1) / span_length
+        # Negative: left rail moves in the -X direction
+        x_entry = -displacement_m * math.sin(math.pi * t_entry)
+        x_exit = -displacement_m * math.sin(math.pi * t_exit)
+
+        if section.left_rail is not None:
+            cls._bend_mesh_x(section.left_rail, x_entry, x_exit)
+
+        if section.left_ballast is not None:
+            section.left_ballast.location.x += (x_entry + x_exit) / 2
+
+        # Outer-left fastener pair: indices 0 (entry-side) and 1 (exit-side)
+        pair_offset_y = max((section.length * section.ballast_length_ratio) * 0.24, 0.02)
+        t0 = 0.5 - pair_offset_y / section.rail_length
+        t1 = 0.5 + pair_offset_y / section.rail_length
+        for idx, t_local in ((0, t0), (1, t1)):
+            if idx < len(section.fasteners):
+                section.fasteners[idx].location.x += x_entry * (1.0 - t_local) + x_exit * t_local
 
 
 # ---------------------------------------------------------------------------
@@ -235,6 +311,7 @@ ALL_DEFECTS: List[type[Defect]] = [
     SkewedBallastDefect,
     MissingFastenerPairDefect,
     RightRailLateralDisplacementDefect,
+    LeftRailLateralDisplacementDefect,
 ]
 
 
