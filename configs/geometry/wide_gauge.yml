@@ -2,9 +2,18 @@
 # All dimensions in metres.
 
 rail_spacing: 1.520
-rail_height: 0.16
-rail_width: 0.07
-rail_lift: 0.0
+
+left_rail:
+  width: 0.07
+  height: 0.16
+  lift: 0.0
+  angle: 0.0
+
+right_rail:
+  width: 0.07
+  height: 0.16
+  lift: 0.0
+  angle: 0.0
 
 sleeper_length: 0.115
 sleeper_height: 0.13

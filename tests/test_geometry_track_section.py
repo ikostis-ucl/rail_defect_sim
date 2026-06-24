@@ -5,7 +5,7 @@ No bpy calls are exercised here — the Blender stub satisfies the import.
 import math
 import pytest
 from unittest.mock import MagicMock
-from app.config.geometry import TrackGeometryConfig
+from app.config.geometry import RailConfig, TrackGeometryConfig
 from app.geometry.track_section import TrackSection
 
 
@@ -62,7 +62,8 @@ def test_layout_middle_sleeper_between_rails():
 def test_layout_widths_are_positive():
     ts = _section()
     layout = ts._compute_layout(0.0)
-    assert layout.side_sleeper_width > 0
+    assert layout.left_side_sleeper_width > 0
+    assert layout.right_side_sleeper_width > 0
     assert layout.middle_sleeper_width > 0
 
 
@@ -70,6 +71,21 @@ def test_layout_wider_rail_spacing_gives_wider_middle():
     narrow = _section(rail_spacing=1.0)
     wide = _section(rail_spacing=2.0)
     assert wide._compute_layout(0.0).middle_sleeper_width > narrow._compute_layout(0.0).middle_sleeper_width
+
+
+def test_layout_independent_rail_widths_affect_side_sleepers():
+    cfg_sym = TrackGeometryConfig(
+        left_rail=RailConfig(width=0.06),
+        right_rail=RailConfig(width=0.06),
+    )
+    cfg_asym = TrackGeometryConfig(
+        left_rail=RailConfig(width=0.06),
+        right_rail=RailConfig(width=0.10),
+    )
+    sym_layout = TrackSection(config=cfg_sym)._compute_layout(0.0)
+    asym_layout = TrackSection(config=cfg_asym)._compute_layout(0.0)
+    assert asym_layout.right_side_sleeper_width > sym_layout.right_side_sleeper_width
+    assert asym_layout.left_side_sleeper_width == pytest.approx(sym_layout.left_side_sleeper_width)
 
 
 # ── geometry_payload ──────────────────────────────────────────────────────────
@@ -95,6 +111,14 @@ def test_geometry_payload_values_match_config():
     assert p["sleeper_height"] == pytest.approx(0.15)
 
 
+def test_geometry_payload_rail_configs_are_nested_dicts():
+    payload = TrackSection().geometry_payload()
+    assert isinstance(payload["left_rail"], dict)
+    assert isinstance(payload["right_rail"], dict)
+    assert "angle" in payload["left_rail"]
+    assert "angle" in payload["right_rail"]
+
+
 def test_geometry_payload_no_ballast_keys():
     for key in TrackSection().geometry_payload():
         assert "ballast" not in key
@@ -113,8 +137,9 @@ def test_sleeper_top_z():
 
 
 def test_rail_center_z_above_sleeper_top():
-    ts = _section(sleeper_height=0.12, rail_height=0.16)
-    assert ts._rail_center_z(0.0) > ts._sleeper_top_z(0.0)
+    rail_cfg = RailConfig(height=0.16)
+    ts = _section(sleeper_height=0.12)
+    assert ts._rail_center_z(0.0, rail_cfg) > ts._sleeper_top_z(0.0)
 
 
 # ── role constants ────────────────────────────────────────────────────────────
@@ -124,27 +149,49 @@ def test_sleeper_role_constant():
     assert "ballast" not in TrackSection.SLEEPER_ROLE
 
 
+def test_left_right_rail_roles_distinct():
+    assert TrackSection.LEFT_RAIL_ROLE != TrackSection.RIGHT_RAIL_ROLE
+
+
 def test_rail_angle_zero_sets_no_rotation():
     import bpy
-    ts = _section(rail_angle=0.0)
+    ts = _section()
     ts.section_parent = bpy.context.active_object
     rail = bpy.context.active_object
     rail.rotation_euler = [0.0, 0.0, 0.0]
-    ts._create_rail(0.0, (0, 0, 0), role=TrackSection.LEFT_RAIL_ROLE,
-                    collection=bpy.context.scene.collection)
+    ts._create_rail(
+        0.0, (0, 0, 0),
+        rail_cfg=RailConfig(angle=0.0),
+        role=TrackSection.LEFT_RAIL_ROLE,
+        collection=bpy.context.scene.collection,
+    )
     assert rail.rotation_euler[2] == pytest.approx(0.0)
 
 
 def test_rail_angle_sets_z_rotation():
-    import math, bpy
+    import bpy
     angle_deg = 5.0
-    ts = _section(rail_angle=angle_deg)
+    ts = _section()
     ts.section_parent = bpy.context.active_object
     rail = bpy.context.active_object
     rail.rotation_euler = [0.0, 0.0, 0.0]
-    ts._create_rail(0.0, (0, 0, 0), role=TrackSection.LEFT_RAIL_ROLE,
-                    collection=bpy.context.scene.collection)
+    ts._create_rail(
+        0.0, (0, 0, 0),
+        rail_cfg=RailConfig(angle=angle_deg),
+        role=TrackSection.LEFT_RAIL_ROLE,
+        collection=bpy.context.scene.collection,
+    )
     assert rail.rotation_euler[2] == pytest.approx(math.radians(angle_deg))
+
+
+def test_independent_left_right_rail_angles_in_config():
+    cfg = TrackGeometryConfig(
+        left_rail=RailConfig(angle=5.0),
+        right_rail=RailConfig(angle=-3.0),
+    )
+    ts = TrackSection(config=cfg)
+    assert ts.config.left_rail.angle == pytest.approx(5.0)
+    assert ts.config.right_rail.angle == pytest.approx(-3.0)
 
 
 def test_all_role_constants_are_strings():
@@ -167,13 +214,14 @@ def test_apply_materials_dispatches_by_role():
         o.data.materials = MagicMock()
         return o
 
-    rail_obj     = _obj(TrackSection.LEFT_RAIL_ROLE)
-    sleeper_obj  = _obj(TrackSection.SLEEPER_ROLE)
-    fastener_obj = _obj(TrackSection.FASTENER_ROLE)
-    parent_obj   = _obj(TrackSection.SECTION_PARENT_ROLE)
+    left_rail_obj  = _obj(TrackSection.LEFT_RAIL_ROLE)
+    right_rail_obj = _obj(TrackSection.RIGHT_RAIL_ROLE)
+    sleeper_obj    = _obj(TrackSection.SLEEPER_ROLE)
+    fastener_obj   = _obj(TrackSection.FASTENER_ROLE)
+    parent_obj     = _obj(TrackSection.SECTION_PARENT_ROLE)
 
     collection = MagicMock()
-    collection.objects = [rail_obj, sleeper_obj, fastener_obj, parent_obj]
+    collection.objects = [left_rail_obj, right_rail_obj, sleeper_obj, fastener_obj, parent_obj]
 
     TrackSection.apply_materials_to_collection(
         collection,
@@ -182,7 +230,8 @@ def test_apply_materials_dispatches_by_role():
         fastener_material=fastener_mat,
     )
 
-    rail_obj.data.materials.append.assert_called_with(rail_mat)
+    left_rail_obj.data.materials.append.assert_called_with(rail_mat)
+    right_rail_obj.data.materials.append.assert_called_with(rail_mat)
     sleeper_obj.data.materials.append.assert_called_with(sleeper_mat)
     fastener_obj.data.materials.append.assert_called_with(fastener_mat)
     parent_obj.data.materials.append.assert_not_called()

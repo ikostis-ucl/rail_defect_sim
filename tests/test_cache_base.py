@@ -34,11 +34,20 @@ def test_key_is_order_independent():
     assert _key({"a": 1, "b": 2}) == _key({"b": 2, "a": 1})
 
 
-def test_key_treats_float_and_string_consistently():
-    # Values are str()-converted before hashing, so float 1.0 → "1.0"
+def test_key_distinguishes_float_and_string():
+    # JSON serialisation preserves types — float 1.0 and string "1.0" must differ.
     k_float = _key({"v": 1.0})
     k_str   = _key({"v": "1.0"})
-    assert k_float == k_str
+    assert k_float != k_str
+
+
+def test_key_handles_nested_dicts():
+    # Nested dicts (from RailConfig.to_dict()) must be serialised recursively.
+    flat = _key({"rail": "x"})
+    nested = _key({"rail": {"angle": 0.0}})
+    assert flat != nested
+    # Same nested structure gives same key
+    assert _key({"rail": {"angle": 0.0, "width": 0.06}}) == _key({"rail": {"width": 0.06, "angle": 0.0}})
 
 
 def test_empty_payload_produces_key():

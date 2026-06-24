@@ -1,5 +1,5 @@
 """
-TrackGeometryConfig — single source of truth for all track geometry dimensions.
+Track geometry configuration — single source of truth for all dimensions.
 
 All values are in metres (1 Blender unit = 1 m).
 Load from a YAML file with TrackGeometryConfig.from_yaml(path).
@@ -8,9 +8,27 @@ Load from a YAML file with TrackGeometryConfig.from_yaml(path).
 from __future__ import annotations
 
 import dataclasses
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+
+@dataclass(frozen=True)
+class RailConfig:
+    """
+    Geometry for a single rail.
+
+    Each rail is configured independently, allowing the left and right rails
+    to have different angles (or, in future, different cross-sections).
+    """
+
+    width: float = 0.06
+    height: float = 0.16
+    lift: float = 0.0    # extra clearance above top-of-sleeper (m)
+    # Rotation around the vertical (Z) axis, in degrees.
+    # 0 = rail parallel to the track axis (normal).
+    # Non-zero = rail tilted in the horizontal plane.
+    angle: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -25,19 +43,15 @@ class TrackGeometryConfig:
 
     Changing sleeper_length or sleeper_pitch_ratio automatically adjusts the
     pitch — the two values cannot drift apart.
+
+    Each rail is configured independently via left_rail / right_rail so that
+    parameters such as angle can differ between the two.
     """
 
-    # ── Rail ─────────────────────────────────────────────────────────────────
-    rail_spacing: float = 1.435   # centre-to-centre, UIC standard gauge
-    rail_height: float = 0.16
-    rail_width: float = 0.06
-    rail_lift: float = 0.0        # extra clearance above top-of-sleeper
-    # Rotation of both rails around the vertical (Z) axis, in degrees.
-    # 0 = rails are parallel to the track axis (normal).
-    # Non-zero values tilt the rails in the horizontal plane, e.g.:
-    #   angle=0  →  || | ||   (normal)
-    #   angle=5  →  \\ | \\   (both rails rotated 5° clockwise)
-    rail_angle: float = 0.0
+    # ── Rail pair ────────────────────────────────────────────────────────────
+    rail_spacing: float = 1.435   # centre-to-centre distance, UIC standard gauge
+    left_rail: RailConfig = field(default_factory=RailConfig)
+    right_rail: RailConfig = field(default_factory=RailConfig)
 
     # ── Sleeper (the wooden plank under the rails) ────────────────────────────
     sleeper_length: float = 0.108   # body length along the track axis (Y)
@@ -72,6 +86,8 @@ class TrackGeometryConfig:
 
         Only keys present in the file override defaults; unknown keys are
         silently ignored so that partial override files are valid.
+        Nested mappings (e.g. left_rail:) are merged with the field defaults,
+        so partial sub-configs are also valid.
         """
         try:
             import yaml
@@ -81,9 +97,33 @@ class TrackGeometryConfig:
                 "Install it with: pip install pyyaml"
             ) from exc
 
+        import typing
+
         with open(path, "r", encoding="utf-8") as fh:
             raw: dict = yaml.safe_load(fh) or {}
 
-        known = {f.name for f in dataclasses.fields(cls)}
-        overrides = {k: v for k, v in raw.items() if k in known}
+        # Resolve string annotations (from __future__ annotations) to actual types
+        try:
+            hints = typing.get_type_hints(cls)
+        except Exception:
+            hints = {}
+
+        known = {f.name: f for f in dataclasses.fields(cls)}
+        overrides: dict[str, Any] = {}
+        for key, val in raw.items():
+            if key not in known:
+                continue
+            ftype = hints.get(key)
+            # Reconstruct nested dataclasses from YAML mappings (partial ok)
+            if (
+                ftype is not None
+                and dataclasses.is_dataclass(ftype)
+                and isinstance(val, dict)
+            ):
+                inner_known = {f.name for f in dataclasses.fields(ftype)}
+                inner_overrides = {k: v for k, v in val.items() if k in inner_known}
+                overrides[key] = dataclasses.replace(ftype(), **inner_overrides)
+            else:
+                overrides[key] = val
+
         return dataclasses.replace(cls(), **overrides)

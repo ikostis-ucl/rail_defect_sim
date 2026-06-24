@@ -14,13 +14,16 @@ def test_geometry_payload_matches_config_fields():
     section = TrackSection(config=cfg)
     payload = section.geometry_payload()
 
-    for field in dataclasses.fields(cfg):
-        assert field.name in payload, f"Missing key: {field.name}"
-        assert payload[field.name] == pytest.approx(getattr(cfg, field.name))
+    for fld in dataclasses.fields(cfg):
+        assert fld.name in payload, f"Missing key: {fld.name}"
+        val = getattr(cfg, fld.name)
+        if dataclasses.is_dataclass(val):
+            assert payload[fld.name] == dataclasses.asdict(val)
+        else:
+            assert payload[fld.name] == pytest.approx(val)
 
 
 def test_geometry_payload_excludes_section_pitch():
-    # section_pitch is a derived property, not a field — must not appear in payload
     cfg = TrackGeometryConfig()
     payload = TrackSection(config=cfg).geometry_payload()
     assert "section_pitch" not in payload

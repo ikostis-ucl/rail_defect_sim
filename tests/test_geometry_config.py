@@ -1,29 +1,56 @@
-"""Unit tests for TrackGeometryConfig."""
+"""Unit tests for TrackGeometryConfig and RailConfig."""
 import dataclasses
 import pytest
-from app.config.geometry import TrackGeometryConfig
+from app.config.geometry import RailConfig, TrackGeometryConfig
 
 
-# ── defaults ──────────────────────────────────────────────────────────────────
+# ── RailConfig defaults ───────────────────────────────────────────────────────
+
+def test_rail_config_defaults():
+    rc = RailConfig()
+    assert rc.width == pytest.approx(0.06)
+    assert rc.height == pytest.approx(0.16)
+    assert rc.lift == pytest.approx(0.0)
+    assert rc.angle == pytest.approx(0.0)
+
+
+def test_rail_config_frozen():
+    rc = RailConfig()
+    with pytest.raises(Exception):
+        rc.angle = 5.0  # type: ignore[misc]
+
+
+def test_rail_config_overrides():
+    rc = RailConfig(width=0.08, angle=3.5)
+    assert rc.width == pytest.approx(0.08)
+    assert rc.angle == pytest.approx(3.5)
+    assert rc.height == pytest.approx(0.16)  # default kept
+
+
+# ── TrackGeometryConfig defaults ──────────────────────────────────────────────
 
 def test_default_rail_spacing():
     assert TrackGeometryConfig().rail_spacing == pytest.approx(1.435)
 
 
-def test_default_rail_height():
-    assert TrackGeometryConfig().rail_height == pytest.approx(0.16)
+def test_default_left_rail_is_rail_config():
+    cfg = TrackGeometryConfig()
+    assert isinstance(cfg.left_rail, RailConfig)
+    assert cfg.left_rail.width == pytest.approx(0.06)
+    assert cfg.left_rail.height == pytest.approx(0.16)
+    assert cfg.left_rail.lift == pytest.approx(0.0)
+    assert cfg.left_rail.angle == pytest.approx(0.0)
 
 
-def test_default_rail_width():
-    assert TrackGeometryConfig().rail_width == pytest.approx(0.06)
+def test_default_right_rail_is_rail_config():
+    cfg = TrackGeometryConfig()
+    assert isinstance(cfg.right_rail, RailConfig)
+    assert cfg.right_rail == RailConfig()
 
 
-def test_default_rail_lift():
-    assert TrackGeometryConfig().rail_lift == pytest.approx(0.0)
-
-
-def test_default_rail_angle():
-    assert TrackGeometryConfig().rail_angle == pytest.approx(0.0)
+def test_default_left_and_right_rail_equal():
+    cfg = TrackGeometryConfig()
+    assert cfg.left_rail == cfg.right_rail
 
 
 def test_default_sleeper_length():
@@ -44,6 +71,26 @@ def test_default_screw_radius():
 
 def test_default_screw_length():
     assert TrackGeometryConfig().screw_length == pytest.approx(0.05)
+
+
+# ── Independent per-rail angles ───────────────────────────────────────────────
+
+def test_independent_left_right_rail_angles():
+    cfg = TrackGeometryConfig(
+        left_rail=RailConfig(angle=5.0),
+        right_rail=RailConfig(angle=-3.0),
+    )
+    assert cfg.left_rail.angle == pytest.approx(5.0)
+    assert cfg.right_rail.angle == pytest.approx(-3.0)
+
+
+def test_independent_left_right_rail_widths():
+    cfg = TrackGeometryConfig(
+        left_rail=RailConfig(width=0.06),
+        right_rail=RailConfig(width=0.08),
+    )
+    assert cfg.left_rail.width == pytest.approx(0.06)
+    assert cfg.right_rail.width == pytest.approx(0.08)
 
 
 # ── derived section_pitch ──────────────────────────────────────────────────────
@@ -102,14 +149,22 @@ def test_to_dict_values_match():
 
 
 def test_to_dict_does_not_include_derived_section_pitch():
-    # section_pitch is a property, not a field — should NOT appear in to_dict
     d = TrackGeometryConfig().to_dict()
     assert "section_pitch" not in d
 
 
-def test_to_dict_includes_rail_angle():
-    cfg = TrackGeometryConfig(rail_angle=5.0)
-    assert cfg.to_dict()["rail_angle"] == pytest.approx(5.0)
+def test_to_dict_left_rail_is_nested_dict():
+    d = TrackGeometryConfig().to_dict()
+    assert isinstance(d["left_rail"], dict)
+    assert "angle" in d["left_rail"]
+    assert d["left_rail"]["angle"] == pytest.approx(0.0)
+
+
+def test_to_dict_right_rail_is_nested_dict():
+    cfg = TrackGeometryConfig(right_rail=RailConfig(angle=7.0))
+    d = cfg.to_dict()
+    assert isinstance(d["right_rail"], dict)
+    assert d["right_rail"]["angle"] == pytest.approx(7.0)
 
 
 def test_to_dict_no_ballast_keys():
@@ -138,7 +193,6 @@ def test_from_yaml_partial_keeps_defaults(tmp_path):
     yml.write_text("rail_spacing: 1.000\n")
     cfg = TrackGeometryConfig.from_yaml(yml)
     assert cfg.rail_spacing == pytest.approx(1.000)
-    # Unspecified fields keep their defaults
     assert cfg.sleeper_height == pytest.approx(TrackGeometryConfig().sleeper_height)
 
 
@@ -161,11 +215,29 @@ def test_from_yaml_file_not_found_raises():
         TrackGeometryConfig.from_yaml("/nonexistent/path/geo.yml")
 
 
-def test_from_yaml_rail_angle(tmp_path):
+def test_from_yaml_left_rail_angle(tmp_path):
     yml = tmp_path / "geo.yml"
-    yml.write_text("rail_angle: 7.5\n")
+    yml.write_text("left_rail:\n  angle: 7.5\n")
     cfg = TrackGeometryConfig.from_yaml(yml)
-    assert cfg.rail_angle == pytest.approx(7.5)
+    assert cfg.left_rail.angle == pytest.approx(7.5)
+    assert cfg.right_rail.angle == pytest.approx(0.0)  # right rail unchanged
+
+
+def test_from_yaml_independent_rail_angles(tmp_path):
+    yml = tmp_path / "geo.yml"
+    yml.write_text("left_rail:\n  angle: 5.0\nright_rail:\n  angle: -3.0\n")
+    cfg = TrackGeometryConfig.from_yaml(yml)
+    assert cfg.left_rail.angle == pytest.approx(5.0)
+    assert cfg.right_rail.angle == pytest.approx(-3.0)
+
+
+def test_from_yaml_partial_rail_config_keeps_rail_defaults(tmp_path):
+    yml = tmp_path / "geo.yml"
+    yml.write_text("left_rail:\n  angle: 2.0\n")
+    cfg = TrackGeometryConfig.from_yaml(yml)
+    assert cfg.left_rail.angle == pytest.approx(2.0)
+    assert cfg.left_rail.width == pytest.approx(RailConfig().width)   # default kept
+    assert cfg.left_rail.height == pytest.approx(RailConfig().height) # default kept
 
 
 def test_from_yaml_section_pitch_recomputed_after_load(tmp_path):
