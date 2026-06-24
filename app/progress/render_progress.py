@@ -11,9 +11,9 @@ except ModuleNotFoundError:
 
 
 class BlenderRenderProgress(AbstractContextManager["BlenderRenderProgress"]):
-    """Show a single tqdm bar for Blender animation renders."""
+    """Show a tqdm bar (or plain per-frame lines) for Blender animation renders."""
 
-    def __init__(self, scene, *, desc: str = "Rendering frames...", leave: bool = False) -> None:
+    def __init__(self, scene, *, desc: str = "Rendering frames", leave: bool = False) -> None:
         self.scene = scene
         self.desc = desc
         self.leave = leave
@@ -28,8 +28,12 @@ class BlenderRenderProgress(AbstractContextManager["BlenderRenderProgress"]):
     def __enter__(self) -> "BlenderRenderProgress":
         import bpy
 
+        # Open a duplicated stderr fd before the silencer blankets it.
+        # This stream stays connected to the terminal even while the silencer
+        # redirects the original stderr fd to /dev/null.
+        self._progress_stream, self._should_close_stream = _open_progress_stream()
+
         if tqdm is not None:
-            self._progress_stream, self._should_close_stream = _open_progress_stream()
             self._progress_bar = tqdm(
                 total=self.total,
                 desc=self.desc,
@@ -39,7 +43,8 @@ class BlenderRenderProgress(AbstractContextManager["BlenderRenderProgress"]):
                 file=self._progress_stream,
             )
         else:
-            print(f"{self.desc}...")
+            self._progress_stream.write(f"{self.desc}: 0/{self.total} frames\n")
+            self._progress_stream.flush()
 
         self._register_handler(bpy.app.handlers.render_init, self._on_render_init)
         self._register_handler(bpy.app.handlers.render_post, self._on_render_post)
@@ -76,6 +81,10 @@ class BlenderRenderProgress(AbstractContextManager["BlenderRenderProgress"]):
         self._completed_frames.add(frame_number)
         if self._progress_bar is not None:
             self._progress_bar.update(1)
+        elif self._progress_stream is not None:
+            done = len(self._completed_frames)
+            self._progress_stream.write(f"\r{self.desc}: {done}/{self.total} frames")
+            self._progress_stream.flush()
 
     def _on_render_complete(self, *_args) -> None:
         self._finish_progress_bar()
@@ -84,11 +93,13 @@ class BlenderRenderProgress(AbstractContextManager["BlenderRenderProgress"]):
         self._finish_progress_bar()
 
     def _finish_progress_bar(self) -> None:
-        if self._progress_bar is None:
-            return
-        remaining = self.total - self._progress_bar.n
-        if remaining > 0:
-            self._progress_bar.update(remaining)
+        if self._progress_bar is not None:
+            remaining = self.total - self._progress_bar.n
+            if remaining > 0:
+                self._progress_bar.update(remaining)
+        elif self._progress_stream is not None:
+            self._progress_stream.write(f"\r{self.desc}: {self.total}/{self.total} frames\n")
+            self._progress_stream.flush()
 
     def _close_progress_bar(self) -> None:
         if self._progress_bar is not None:
@@ -101,9 +112,9 @@ class BlenderRenderProgress(AbstractContextManager["BlenderRenderProgress"]):
 
 
 def render_progress(
-    scene, *, desc: str = "Rendering frames...", leave: bool = False
+    scene, *, desc: str = "Rendering frames", leave: bool = False
 ) -> BlenderRenderProgress:
-    """Create a context manager that shows a single progress bar for animation rendering."""
+    """Create a context manager that shows a progress bar for animation rendering."""
     return BlenderRenderProgress(scene, desc=desc, leave=leave)
 
 

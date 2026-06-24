@@ -25,6 +25,7 @@ class RailwayVideoPipeline:
         self.camera_animator = CameraAnimator(settings)
 
     def run(self) -> None:
+        self.scene_setup.setup_metric_units()
         self.scene_setup.cleanup_scene()
         self.scene_setup.setup_world()
 

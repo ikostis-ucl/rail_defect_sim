@@ -1,6 +1,7 @@
 import bpy
 
 from app.config import PipelineSettings
+from app.config.geometry import TrackGeometryConfig
 from app.geometry.cache import TrackSectionCache, DefectiveSectionCache
 from app.geometry.defects import DefectSelector
 from app.geometry.track_section import TrackSection
@@ -26,9 +27,10 @@ class TrackBuilder:
         fastener_mat = self.materials.create_fastener_material()
         grass_mat    = self.materials.create_grass_material()
 
+        geometry_cfg = self._load_geometry_config()
+
         track_length = self.settings.track_length
-        section_spacing = 0.18
-        sleeper_length_ratio = (0.15 * 0.72) / section_spacing
+        section_spacing = geometry_cfg.section_pitch
         section_z = 0.1
 
         bpy.ops.mesh.primitive_plane_add(size=1, location=(0, track_length / 2, -0.3))
@@ -39,19 +41,8 @@ class TrackBuilder:
 
         num_sections = int(track_length / section_spacing) + 1
 
-        section_params = dict(
-            length=section_spacing,
-            rail_spacing=1.4,
-            rail_height=0.16,
-            rail_width=0.06,
-            sleeper_height=0.12,
-            rail_length=section_spacing,
-            sleeper_length_ratio=sleeper_length_ratio,
-        )
-
-        prototype_collection = self.section_cache.get_or_create_prototype_collection(
-            TrackSection(**section_params)
-        )
+        prototype = TrackSection(config=geometry_cfg)
+        prototype_collection = self.section_cache.get_or_create_prototype_collection(prototype)
         TrackSection.apply_materials_to_collection(
             prototype_collection,
             rail_material=rail_mat,
@@ -67,11 +58,16 @@ class TrackBuilder:
         track_parent.name = "ModularTrack"
         move_to_collection(track_parent, track_sections_collection)
 
-        defect_selector = DefectSelector.default()
+        force_defect = getattr(self.settings, "force_defect", None)
+        defect_selector = (
+            DefectSelector.forced(force_defect)
+            if force_defect
+            else DefectSelector.default()
+        )
         defective_collections = {}
         for variant in defect_selector.all_variants():
             defective_col = self.defective_cache.get_or_create_defective_collection(
-                TrackSection(**section_params),
+                TrackSection(config=geometry_cfg),
                 variant,
             )
             TrackSection.apply_materials_to_collection(
@@ -120,3 +116,9 @@ class TrackBuilder:
             f"{defect_count} defective section(s) out of {num_sections} total "
             f"({100 * defect_count / max(num_sections, 1):.1f} %)."
         )
+
+    def _load_geometry_config(self) -> TrackGeometryConfig:
+        config_path = getattr(self.settings, "geometry_config_path", None)
+        if config_path:
+            return TrackGeometryConfig.from_yaml(config_path)
+        return TrackGeometryConfig()

@@ -10,7 +10,8 @@ def _make(**overrides):
         middle_sleeper_width=1.28,
         right_rail_x=0.7,
         right_sleeper_x=0.8,
-        side_sleeper_width=0.192,
+        left_side_sleeper_width=0.192,
+        right_side_sleeper_width=0.192,
     )
     defaults.update(overrides)
     return TrackSectionLayout(**defaults)
@@ -24,7 +25,8 @@ def test_fields_accessible():
     assert layout.middle_sleeper_width == pytest.approx(1.28)
     assert layout.right_rail_x == pytest.approx(0.7)
     assert layout.right_sleeper_x == pytest.approx(0.8)
-    assert layout.side_sleeper_width == pytest.approx(0.192)
+    assert layout.left_side_sleeper_width == pytest.approx(0.192)
+    assert layout.right_side_sleeper_width == pytest.approx(0.192)
 
 
 def test_frozen_rejects_mutation():
@@ -43,3 +45,8 @@ def test_inequality_on_different_value():
     a = _make(left_sleeper_x=-0.8)
     b = _make(left_sleeper_x=-0.9)
     assert a != b
+
+
+def test_asymmetric_side_widths():
+    layout = _make(left_side_sleeper_width=0.15, right_side_sleeper_width=0.20)
+    assert layout.left_side_sleeper_width != layout.right_side_sleeper_width

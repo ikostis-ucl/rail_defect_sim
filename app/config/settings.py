@@ -23,6 +23,17 @@ class PipelineSettings:
     start_frame: int = 1
     track_length: int = 100000
     base_speed_units_per_frame: float = 2.5
+    geometry_config_path: str | None = None  # path to a geometry .yml config file
+    force_defect: str | None = None          # if set, 100% of sections get this defect
+
+    # Camera placement and orientation. Defaults reproduce the original
+    # bird's-eye view (2.45 m above the track centre, looking straight down).
+    camera_height: float = 2.45            # Z position in metres
+    camera_lateral_offset: float = 0.0     # X position in metres (+ = right of track)
+    camera_tilt_deg: float = 0.0           # pitch about X: 0 = straight down, 90 = forward
+    camera_yaw_deg: float = 0.0            # pan about vertical axis (turn left/right)
+    camera_roll_deg: float = 0.0           # bank about the view axis
+    camera_lens: float = 35.0              # focal length in mm (lower = wider FOV)
 
     @property
     def total_frames(self) -> int:

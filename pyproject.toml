@@ -6,6 +6,7 @@ requires-python = ">=3.13, <3.14"
 dependencies = [
     "bpy>=5.1.0",
     "configargparse>=1.7.5",
+    "pyyaml>=6.0",
     "tqdm>=4.67.1",
 ]
 
@@ -13,5 +14,5 @@ dependencies = [
 dev = ["pytest>=7"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "tests/integration"]
 pythonpath = ["."]

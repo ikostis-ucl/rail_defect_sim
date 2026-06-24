@@ -51,7 +51,7 @@ app/
       prototype.py          TrackSectionCache (healthy prototypes)
       defective.py          DefectiveSectionCache (defect variants)
     track_section_cache.py  thin re-export shim → cache/ (back-compat)
-    defects/              Defect system: variants, registry, probabilistic selector
+    defects/              Defect system (package): base, variant, per-defect modules, registry, selector
     track_builder.py      Builds the full track by instantiating cached sections
   camera/                 camera setup and animation
   materials/
@@ -67,13 +67,41 @@ assets/
 
 ## Defect system
 
-Defects are defined in `track_defects.py` as subclasses of `Defect`. Each declares a fixed set of `DefectVariant`s (pure data) and an `apply()` classmethod that mutates a `TrackSection`.
+Defects live in the `app/geometry/defects/` package, each as a subclass of `Defect` (`base.py`). Each declares a fixed set of `DefectVariant`s (pure data) and an `apply()` classmethod that mutates a `TrackSection`. Subclasses are collected in `registry.py` (`ALL_DEFECTS`).
 
-Current defect types:
-- `SkewedBallastDefect` — ballast rotated ±2° or ±5° out of perpendicular
-- `MissingFastenerPairDefect` — one of four fastener pairs removed
+Current defect types (the string is the `NAME`, used as the cache key and to force a defect):
 
-`DefectSelector.default()` probabilistically injects defects: **10% of sections** receive a randomly chosen variant. To add a new defect type, subclass `Defect` and add it to `ALL_DEFECTS`.
+| `NAME` | Class | Effect |
+|---|---|---|
+| `skewed_sleeper` | `SkewedSleeperDefect` | sleeper rotated ±2° or ±5° out of perpendicular |
+| `missing_fastener_pair` | `MissingFastenerPairDefect` | one of four fastener pairs removed |
+| `right_rail_lateral_displacement` | `RightRailLateralDisplacementDefect` | right rail bent outward (gauge widens right) |
+| `left_rail_lateral_displacement` | `LeftRailLateralDisplacementDefect` | left rail bent outward (gauge widens left) |
+| `left_rail_inward_displacement` | `LeftRailInwardDisplacementDefect` | left rail bent inward (toward centre) |
+| `right_rail_inward_displacement` | `RightRailInwardDisplacementDefect` | right rail bent inward (toward centre) |
+| `both_rails_gauge_widening` | `BothRailsGaugeWideningDefect` | both rails bend apart (gauge widens) |
+| `both_rails_gauge_narrowing` | `BothRailsGaugeNarrowingDefect` | both rails bend together (gauge narrows) |
+| `both_rails_shift_left` | `BothRailsShiftLeftDefect` | whole track bends left |
+| `both_rails_shift_right` | `BothRailsShiftRightDefect` | whole track bends right |
+
+The rail-displacement defects share a `RailDisplacementDefect` base (`rail_displacement.py`): the rail mesh is sheared along a half-sine arch over a **span** of consecutive sections (5 or 7) so the bend is continuous; the sleeper is translated rigidly (stays straight) and the outer fastener pair follows. A `(side, sign)` `BENDS` list drives which rail(s) bend and in which direction — one tuple = single rail, two tuples = both rails. Magnitude variants: 3 cm / 6 cm / 10 cm.
+
+`DefectSelector.default()` probabilistically injects defects: **10% of sections** *start* a defect (`DEFECT_PROBABILITY`); multi-section spans then queue their follower positions automatically. To add a new defect type, subclass `Defect` (or `RailDisplacementDefect`) and add it to `ALL_DEFECTS` in `registry.py` — the defective cache invalidates automatically (it fingerprints the `defects/` sources; see Section caching).
+
+### Forcing a specific defect
+
+There is no CLI flag yet — edit `DefectSelector.default()` in `selector.py` to register only the defect you want and raise the rate:
+
+```python
+selector.DEFECT_PROBABILITY = 1.0                      # every eligible section
+for defect_class in ALL_DEFECTS:
+    if defect_class.NAME != "both_rails_gauge_widening":  # ← your NAME from the table
+        continue
+    for span_group in defect_class.span_groups():
+        selector.register_span(span_group)
+```
+
+Revert both changes to restore the random mix. At `1.0` the displacement spans run back-to-back; lower the probability for healthy track between occurrences.
 
 ## Section caching
 

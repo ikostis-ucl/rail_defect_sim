@@ -11,8 +11,9 @@ _GEOM_DIR = Path(__file__).resolve().parents[1]  # app/geometry
 
 # A defective section is a healthy section plus a defect mutation, so its build
 # logic depends on the prototype sources (incl. the geometry helpers
-# TrackSection.build imports) *and* every defect module.  Globbing the defects
-# package means new defect files are picked up automatically.
+# TrackSection.build imports) *and* every defect module.  rglob recurses into
+# the per-defect subpackages (e.g. defects/rail_displacement/), so new defect
+# files anywhere under defects/ are picked up automatically.
 # test_cache_source_paths.py guards that build dependencies stay listed here.
 _SOURCE_FILES = (
     _GEOM_DIR / "track_section.py",
@@ -20,7 +21,7 @@ _SOURCE_FILES = (
     _GEOM_DIR / "utils.py",
     _GEOM_DIR / "cache" / "base.py",
     _GEOM_DIR / "cache" / "defective.py",
-    *sorted((_GEOM_DIR / "defects").glob("*.py")),
+    *sorted((_GEOM_DIR / "defects").rglob("*.py")),
 )
 
 
