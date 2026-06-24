@@ -1,0 +1,10 @@
+[project]
+name = "tsv-twin"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13, <3.14"
+dependencies = [
+    "bpy>=5.1.0",
+    "configargparse>=1.7.5",
+    "tqdm>=4.67.1",
+]
