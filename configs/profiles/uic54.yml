@@ -1,0 +1,31 @@
+# UIC54 (54E1) rail profile — Camrail metre-gauge mainlines (Cameroon)
+# Source: UIC leaflet 860, Table 1; Camrail concrete monoblock sleeper specification.
+#
+# These values are the *reference* used by validate_against_profile("UIC54").
+# If a configured dimension deviates beyond tolerance it is adjusted to the
+# standard value.  Fields not listed here are never adjusted.
+#
+# All linear dimensions in millimetres.  sleeper_pitch_ratio is dimensionless.
+
+name: UIC54
+standard: 54E1
+
+# Rail cross-section (gauge-independent absolute values)
+head_width_mm: 70.0       # rail crown width (top running surface)
+foot_width_mm: 140.0      # base flange width (determines fastener seat positions)
+height_mm: 159.0          # total rail height (foot bottom to head top)
+
+# Sleeper — Camrail concrete monoblock
+#   Along-track depth (sleeper_depth) = 200 mm.
+#   Centre-to-centre pitch range: 600–660 mm → 1 500–1 666 sleepers/km.
+#   Clear gap at minimum pitch:  600 − 200 = 400 mm.
+#   section_pitch = sleeper_depth_mm / 1000 / sleeper_pitch_ratio
+#                 = 0.200 / 0.320 = 0.625 m  (mid-range of Camrail spec)
+sleeper_depth_mm: 200.0
+sleeper_height_mm: 200.0
+sleeper_pitch_ratio: 0.320     # 200 mm / 625 mm = 0.320
+
+# Fasteners — Nabla / Vossloh SKL-style elastic spring-steel clips
+clip_diameter_mm: 13.0    # clip rod diameter
+clip_height_mm: 30.0      # clip protrusion above sleeper surface
+pad_thickness_mm: 7.0     # EVA / rubber rail pad between rail foot and sleeper

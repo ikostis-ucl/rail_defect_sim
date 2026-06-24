@@ -1,0 +1,38 @@
+# tsv-twin track geometry — Camrail (Cameroon) metre-gauge mainline
+# Rail profile: UIC54 (54E1)
+# Track gauge: 1000 mm (metre gauge)
+#
+# Explicit Cameroon config — identical to default.yml.
+# Keep this file as a named reference when testing multiple gauge setups
+# side-by-side, or when default.yml is overridden for a different baseline.
+#
+# Source: Camrail (Cameroun Railways) permanent-way standards,
+#         UIC leaflet 860 (54E1 cross-section dimensions).
+
+rail_spacing: 1.000         # Camrail metre gauge
+
+left_rail:
+  head_width: 0.070         # rail crown width — visual width of the running surface
+  foot_width: 0.140         # base flange width — drives fastener seat positions
+  height: 0.159             # total rail height from foot bottom to head top
+  pad_thickness: 0.007      # EVA/rubber pad between rail foot and sleeper surface
+  lift: 0.0
+  angle: 0.0
+
+right_rail:
+  head_width: 0.070
+  foot_width: 0.140
+  height: 0.159
+  pad_thickness: 0.007
+  lift: 0.0
+  angle: 0.0
+
+# Camrail concrete monoblock sleeper: 200 mm along-track depth
+sleeper_depth: 0.200
+sleeper_height: 0.200
+
+# 0.200 / 0.320 = 0.625 m pitch (mid-range of 600–660 mm Camrail standard)
+sleeper_pitch_ratio: 0.320
+
+screw_radius: 0.0065        # Nabla/Vossloh SKL clip: 13 mm diameter → 6.5 mm radius
+screw_length: 0.035         # clip protrusion above sleeper surface
