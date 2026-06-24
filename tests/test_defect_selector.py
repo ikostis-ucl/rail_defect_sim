@@ -88,7 +88,7 @@ def test_defect_probability_reflects_span_coverage():
 
 
 def test_forced_selector_always_returns_a_variant():
-    from app.geometry.defects.right_rail_displacement import RightRailLateralDisplacementDefect
+    from app.geometry.defects.rail_displacement import RightRailLateralDisplacementDefect
     sel = DefectSelector.forced("right_rail_lateral_displacement", seed=0)
     for _ in range(50):
         v = sel.select_variant()
@@ -103,7 +103,7 @@ def test_forced_selector_unknown_name_raises():
 
 
 def test_forced_selector_only_contains_named_defect():
-    from app.geometry.defects.right_rail_displacement import RightRailLateralDisplacementDefect
+    from app.geometry.defects.rail_displacement import RightRailLateralDisplacementDefect
     sel = DefectSelector.forced("right_rail_lateral_displacement")
     for v in sel.all_variants():
         assert v.defect_name == RightRailLateralDisplacementDefect.NAME
