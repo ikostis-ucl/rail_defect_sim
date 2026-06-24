@@ -5,11 +5,7 @@ from dataclasses import dataclass
 class TrackSectionLayout:
     """Computed X-axis positions for a single cross-section assembly."""
 
-    left_sleeper_x: float
     left_rail_x: float
-    middle_sleeper_x: float
-    middle_sleeper_width: float
     right_rail_x: float
-    right_sleeper_x: float
-    left_side_sleeper_width: float
-    right_side_sleeper_width: float
+    sleeper_x: float
+    sleeper_width: float

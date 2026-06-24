@@ -16,10 +16,10 @@ class TrackSection:
     """
     Represents a single modular section of railway track.
 
-    Creates an H-shaped assembly (top view: -- : | : --):
+    Creates an H-shaped assembly (top view: -- = --):
       - Two parallel rails (left and right, each with its own RailConfig)
-      - Three-piece sleeper (left outer, middle, right outer)
-      - Eight fastener cylinders distributed across the sleeper pieces
+      - One merged sleeper spanning the full cross-track width (concrete monoblock)
+      - Eight fastener cylinders distributed across the sleeper
 
     All geometry dimensions come from a TrackGeometryConfig.
     section_pitch (the Y span of this section) is derived:
@@ -46,10 +46,11 @@ class TrackSection:
 
         self.left_rail = None
         self.right_rail = None
+        self.sleeper = None
+        # Kept for backwards compatibility — all three reference the same merged object.
         self.left_sleeper = None
         self.middle_sleeper = None
         self.right_sleeper = None
-        self.sleeper = None
         self.fasteners: List[object] = []
         self.section_parent = None
 
@@ -67,26 +68,25 @@ class TrackSection:
 
         layout = self._compute_layout(x)
 
-        self.left_sleeper = self._create_sleeper_piece(
-            x_pos=layout.left_sleeper_x,
-            width=layout.left_side_sleeper_width,
+        sleeper = self._create_sleeper_piece(
+            x_pos=layout.sleeper_x,
+            width=layout.sleeper_width,
             parent_location=(x, y, z),
             collection=target_collection,
-            name="SleeperLeft",
+            name="Sleeper",
         )
+        # One merged monoblock — all three attributes reference the same object.
+        self.sleeper = sleeper
+        self.left_sleeper = sleeper
+        self.middle_sleeper = sleeper
+        self.right_sleeper = sleeper
+
         self.left_rail = self._create_rail(
             x_offset=layout.left_rail_x - x,
             parent_location=(x, y, z),
             rail_cfg=cfg.left_rail,
             role=self.LEFT_RAIL_ROLE,
             collection=target_collection,
-        )
-        self.middle_sleeper = self._create_sleeper_piece(
-            x_pos=layout.middle_sleeper_x,
-            width=layout.middle_sleeper_width,
-            parent_location=(x, y, z),
-            collection=target_collection,
-            name="SleeperMiddle",
         )
         self.right_rail = self._create_rail(
             x_offset=layout.right_rail_x - x,
@@ -95,14 +95,6 @@ class TrackSection:
             role=self.RIGHT_RAIL_ROLE,
             collection=target_collection,
         )
-        self.right_sleeper = self._create_sleeper_piece(
-            x_pos=layout.right_sleeper_x,
-            width=layout.right_side_sleeper_width,
-            parent_location=(x, y, z),
-            collection=target_collection,
-            name="SleeperRight",
-        )
-        self.sleeper = self.middle_sleeper
         self.fasteners = self._create_fasteners(parent_location=(x, y, z), collection=target_collection)
         self.correct_contiguity(z)
         return self.section_parent
@@ -191,31 +183,19 @@ class TrackSection:
         left_rail_x  = center_x - cfg.rail_spacing / 2
         right_rail_x = center_x + cfg.rail_spacing / 2
 
-        # Outer sleepers match the rail foot width — the foot is the structural
-        # reference for fastener seats and sleeper extent.
-        left_side_sleeper_width  = lr.foot_width
-        right_side_sleeper_width = rr.foot_width
-
-        # Middle sleeper spans the gap between the inner edges of both rail feet.
-        middle_edge_left  = left_rail_x  + lr.foot_width / 2
-        middle_edge_right = right_rail_x - rr.foot_width / 2
-        middle_sleeper_width = max(middle_edge_right - middle_edge_left,
-                                   max(lr.foot_width, rr.foot_width))
-        middle_sleeper_x = (middle_edge_left + middle_edge_right) / 2
-
-        # Outer sleepers sit immediately beyond the outer rail foot edge.
-        left_sleeper_x  = left_rail_x  - lr.foot_width / 2 - left_side_sleeper_width / 2
-        right_sleeper_x = right_rail_x + rr.foot_width / 2 + right_side_sleeper_width / 2
+        # Single monoblock sleeper: spans from one foot_width beyond each outer
+        # rail foot edge.  This matches the previous 3-piece total width while
+        # eliminating gaps at the foot-to-head transitions.
+        sleeper_left_edge  = left_rail_x  - 3 * lr.foot_width / 2
+        sleeper_right_edge = right_rail_x + 3 * rr.foot_width / 2
+        sleeper_width = sleeper_right_edge - sleeper_left_edge
+        sleeper_x     = (sleeper_left_edge + sleeper_right_edge) / 2
 
         return TrackSectionLayout(
-            left_sleeper_x=left_sleeper_x,
             left_rail_x=left_rail_x,
-            middle_sleeper_x=middle_sleeper_x,
-            middle_sleeper_width=middle_sleeper_width,
             right_rail_x=right_rail_x,
-            right_sleeper_x=right_sleeper_x,
-            left_side_sleeper_width=left_side_sleeper_width,
-            right_side_sleeper_width=right_side_sleeper_width,
+            sleeper_x=sleeper_x,
+            sleeper_width=sleeper_width,
         )
 
     # ------------------------------------------------------------------
@@ -354,13 +334,7 @@ class TrackSection:
     # ------------------------------------------------------------------
 
     def get_all_components(self) -> List[object]:
-        candidates = [
-            self.left_rail,
-            self.right_rail,
-            self.left_sleeper,
-            self.middle_sleeper,
-            self.right_sleeper,
-        ]
+        candidates = [self.left_rail, self.right_rail, self.sleeper]
         return [c for c in candidates if c is not None] + list(self.fasteners)
 
     def get_sleeper(self) -> object:

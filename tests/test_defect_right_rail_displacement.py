@@ -91,43 +91,41 @@ def _make_section(cfg=None):
     return section
 
 
-def test_apply_first_section_entry_offset_is_zero():
-    # position=0 → t_entry=0 → sin(0)=0 → x_entry=0
+def test_apply_first_section_entry_fastener_is_minimal():
+    # position=0 → t_entry=0 → x_entry=0 → entry fastener (6) barely moves
     section = _make_section()
     RightRailLateralDisplacementDefect.apply(section, {
         "displacement_m": 0.06,
         "span_length": 5,
         "position": 0,
     })
-    # x_entry = 0 so sleeper shift = (0 + x_exit) / 2 = x_exit / 2 > 0
-    assert section.right_sleeper.location.x >= 0.0
+    # Entry fastener displacement is 0 × (1-t) + x_exit × t, so |shift| < displacement_m
+    assert abs(section.fasteners[6].location.x) < 0.06
 
 
-def test_apply_last_section_exit_offset_is_zero():
-    # position=N-1 → t_exit=1 → sin(π)=0 → x_exit=0
+def test_apply_last_section_exit_fastener_is_minimal():
+    # position=N-1 → t_exit=1 → x_exit=0 → exit fastener (7) barely moves
     section = _make_section()
     RightRailLateralDisplacementDefect.apply(section, {
         "displacement_m": 0.06,
         "span_length": 5,
         "position": 4,
     })
-    # x_exit = 0 so sleeper shift = (x_entry + 0) / 2 = x_entry / 2 > 0
-    assert section.right_sleeper.location.x >= 0.0
+    assert abs(section.fasteners[7].location.x) < 0.06
 
 
 def test_apply_midspan_section_has_maximum_offset():
-    # Position at span midpoint has largest x values
-    def peak_shift(position, span_length=5, displacement_m=0.10):
+    # Fastener 6 shift is largest near the span midpoint.
+    def fastener_shift(position, span_length=5, displacement_m=0.10):
         section = _make_section()
         RightRailLateralDisplacementDefect.apply(section, {
             "displacement_m": displacement_m,
             "span_length": span_length,
             "position": position,
         })
-        return section.right_sleeper.location.x
+        return abs(section.fasteners[6].location.x)
 
-    shifts = [peak_shift(i) for i in range(5)]
-    # Middle positions should have higher shifts than edge positions
+    shifts = [fastener_shift(i) for i in range(5)]
     assert shifts[2] > shifts[0]
     assert shifts[2] > shifts[4]
 
@@ -171,14 +169,14 @@ def test_apply_does_not_shift_inner_fasteners():
 
 
 def test_apply_larger_displacement_gives_larger_shift():
-    def sleeper_shift(displacement_m):
+    def fastener_shift(displacement_m):
         section = _make_section()
         RightRailLateralDisplacementDefect.apply(section, {
             "displacement_m": displacement_m, "span_length": 5, "position": 2,
         })
-        return section.right_sleeper.location.x
+        return abs(section.fasteners[6].location.x)
 
-    assert sleeper_shift(0.10) > sleeper_shift(0.03)
+    assert fastener_shift(0.10) > fastener_shift(0.03)
 
 
 def test_apply_uses_config_for_fastener_interpolation():

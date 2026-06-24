@@ -46,46 +46,39 @@ def test_layout_rails_shift_with_center_x():
     assert layout.right_rail_x == pytest.approx(2.0 + 0.7)
 
 
-def test_layout_sleepers_outside_rails():
+def test_layout_sleeper_spans_beyond_rails():
     ts = _section()
     layout = ts._compute_layout(0.0)
-    assert layout.left_sleeper_x < layout.left_rail_x
-    assert layout.right_sleeper_x > layout.right_rail_x
+    sleeper_left  = layout.sleeper_x - layout.sleeper_width / 2
+    sleeper_right = layout.sleeper_x + layout.sleeper_width / 2
+    assert sleeper_left  < layout.left_rail_x
+    assert sleeper_right > layout.right_rail_x
 
 
-def test_layout_middle_sleeper_between_rails():
+def test_layout_sleeper_centered_on_symmetric_track():
+    ts = _section(rail_spacing=1.4)
+    layout = ts._compute_layout(0.0)
+    assert layout.sleeper_x == pytest.approx(0.0)
+
+
+def test_layout_sleeper_width_positive():
     ts = _section()
     layout = ts._compute_layout(0.0)
-    assert layout.left_rail_x < layout.middle_sleeper_x < layout.right_rail_x
+    assert layout.sleeper_width > 0
 
 
-def test_layout_widths_are_positive():
-    ts = _section()
-    layout = ts._compute_layout(0.0)
-    assert layout.left_side_sleeper_width > 0
-    assert layout.right_side_sleeper_width > 0
-    assert layout.middle_sleeper_width > 0
-
-
-def test_layout_wider_rail_spacing_gives_wider_middle():
+def test_layout_wider_rail_spacing_gives_wider_sleeper():
     narrow = _section(rail_spacing=1.0)
-    wide = _section(rail_spacing=2.0)
-    assert wide._compute_layout(0.0).middle_sleeper_width > narrow._compute_layout(0.0).middle_sleeper_width
+    wide   = _section(rail_spacing=2.0)
+    assert wide._compute_layout(0.0).sleeper_width > narrow._compute_layout(0.0).sleeper_width
 
 
-def test_layout_independent_rail_foot_widths_affect_side_sleepers():
-    cfg_sym = TrackGeometryConfig(
-        left_rail=RailConfig(foot_width=0.140),
-        right_rail=RailConfig(foot_width=0.140),
-    )
-    cfg_asym = TrackGeometryConfig(
-        left_rail=RailConfig(foot_width=0.140),
-        right_rail=RailConfig(foot_width=0.180),
-    )
-    sym_layout = TrackSection(config=cfg_sym)._compute_layout(0.0)
-    asym_layout = TrackSection(config=cfg_asym)._compute_layout(0.0)
-    assert asym_layout.right_side_sleeper_width > sym_layout.right_side_sleeper_width
-    assert asym_layout.left_side_sleeper_width == pytest.approx(sym_layout.left_side_sleeper_width)
+def test_layout_wider_rail_foot_gives_wider_sleeper():
+    cfg_narrow = TrackGeometryConfig(right_rail=RailConfig(foot_width=0.140))
+    cfg_wide   = TrackGeometryConfig(right_rail=RailConfig(foot_width=0.180))
+    narrow_layout = TrackSection(config=cfg_narrow)._compute_layout(0.0)
+    wide_layout   = TrackSection(config=cfg_wide)._compute_layout(0.0)
+    assert wide_layout.sleeper_width > narrow_layout.sleeper_width
 
 
 # ── geometry_payload ──────────────────────────────────────────────────────────

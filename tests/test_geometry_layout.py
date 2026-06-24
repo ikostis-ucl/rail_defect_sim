@@ -4,14 +4,10 @@ from app.geometry.layout import TrackSectionLayout
 
 def _make(**overrides):
     defaults = dict(
-        left_sleeper_x=-0.8,
         left_rail_x=-0.7,
-        middle_sleeper_x=0.0,
-        middle_sleeper_width=1.28,
         right_rail_x=0.7,
-        right_sleeper_x=0.8,
-        left_side_sleeper_width=0.192,
-        right_side_sleeper_width=0.192,
+        sleeper_x=0.0,
+        sleeper_width=1.42,
     )
     defaults.update(overrides)
     return TrackSectionLayout(**defaults)
@@ -19,20 +15,16 @@ def _make(**overrides):
 
 def test_fields_accessible():
     layout = _make()
-    assert layout.left_sleeper_x == pytest.approx(-0.8)
     assert layout.left_rail_x == pytest.approx(-0.7)
-    assert layout.middle_sleeper_x == pytest.approx(0.0)
-    assert layout.middle_sleeper_width == pytest.approx(1.28)
     assert layout.right_rail_x == pytest.approx(0.7)
-    assert layout.right_sleeper_x == pytest.approx(0.8)
-    assert layout.left_side_sleeper_width == pytest.approx(0.192)
-    assert layout.right_side_sleeper_width == pytest.approx(0.192)
+    assert layout.sleeper_x == pytest.approx(0.0)
+    assert layout.sleeper_width == pytest.approx(1.42)
 
 
 def test_frozen_rejects_mutation():
     layout = _make()
     with pytest.raises(Exception):
-        layout.left_sleeper_x = 0.0  # type: ignore[misc]
+        layout.left_rail_x = 0.0  # type: ignore[misc]
 
 
 def test_equality():
@@ -42,11 +34,12 @@ def test_equality():
 
 
 def test_inequality_on_different_value():
-    a = _make(left_sleeper_x=-0.8)
-    b = _make(left_sleeper_x=-0.9)
+    a = _make(sleeper_x=0.0)
+    b = _make(sleeper_x=0.05)
     assert a != b
 
 
-def test_asymmetric_side_widths():
-    layout = _make(left_side_sleeper_width=0.15, right_side_sleeper_width=0.20)
-    assert layout.left_side_sleeper_width != layout.right_side_sleeper_width
+def test_sleeper_spans_beyond_rails():
+    layout = _make()
+    assert layout.sleeper_x - layout.sleeper_width / 2 < layout.left_rail_x
+    assert layout.sleeper_x + layout.sleeper_width / 2 > layout.right_rail_x
