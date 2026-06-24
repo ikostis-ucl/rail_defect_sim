@@ -1,15 +1,16 @@
 import bpy
 
 from app.config import PipelineSettings
-from app.geometry.track_section import TrackSection, move_to_collection
-from app.geometry.track_section_cache import TrackSectionCache
-from app.geometry.track_defects import DefectSelector, DefectiveSectionCache
+from app.geometry.cache import TrackSectionCache, DefectiveSectionCache
+from app.geometry.defects import DefectSelector
+from app.geometry.track_section import TrackSection
+from app.geometry.utils import move_to_collection
 from app.materials import MaterialFactory
 from app.progress import progress_iter
 
 
 class TrackBuilder:
-    """Creates rails, sleepers, ballast, fasteners, and terrain."""
+    """Creates rails, sleepers, fasteners, and terrain."""
 
     def __init__(self, settings: PipelineSettings, materials: MaterialFactory) -> None:
         self.settings = settings
@@ -20,14 +21,14 @@ class TrackBuilder:
     def build(self) -> None:
         print("Modeling geometry (modular approach)...")
 
-        rail_mat      = self.materials.create_rail_material()
-        ballast_mat   = self.materials.create_ballast_material()
-        fastener_mat  = self.materials.create_fastener_material()
-        grass_mat     = self.materials.create_grass_material()
+        rail_mat     = self.materials.create_rail_material()
+        sleeper_mat  = self.materials.create_sleeper_material()
+        fastener_mat = self.materials.create_fastener_material()
+        grass_mat    = self.materials.create_grass_material()
 
         track_length = self.settings.track_length
         section_spacing = 0.18
-        ballast_length_ratio = (0.15 * 0.72) / section_spacing
+        sleeper_length_ratio = (0.15 * 0.72) / section_spacing
         section_z = 0.1
 
         bpy.ops.mesh.primitive_plane_add(size=1, location=(0, track_length / 2, -0.3))
@@ -43,9 +44,9 @@ class TrackBuilder:
             rail_spacing=1.4,
             rail_height=0.16,
             rail_width=0.06,
-            ballast_height=0.12,
+            sleeper_height=0.12,
             rail_length=section_spacing,
-            ballast_length_ratio=ballast_length_ratio,
+            sleeper_length_ratio=sleeper_length_ratio,
         )
 
         prototype_collection = self.section_cache.get_or_create_prototype_collection(
@@ -54,7 +55,7 @@ class TrackBuilder:
         TrackSection.apply_materials_to_collection(
             prototype_collection,
             rail_material=rail_mat,
-            ballast_material=ballast_mat,
+            sleeper_material=sleeper_mat,
             fastener_material=fastener_mat,
         )
 
@@ -76,7 +77,7 @@ class TrackBuilder:
             TrackSection.apply_materials_to_collection(
                 defective_col,
                 rail_material=rail_mat,
-                ballast_material=ballast_mat,
+                sleeper_material=sleeper_mat,
                 fastener_material=fastener_mat,
             )
             defective_collections[variant.identifier] = defective_col

@@ -1,6 +1,6 @@
 """Procedural material builders."""
 
-from .material_factory import MaterialFactory
+from .factory import MaterialFactory
 
 __all__ = ["MaterialFactory"]
 

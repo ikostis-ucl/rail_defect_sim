@@ -12,7 +12,7 @@ class CameraAnimator:
     @staticmethod
     def setup_camera():
         print("Setting up camera...")
-        # Lower camera altitude so rails/ballast fill most of the frame.
+        # Lower camera altitude so rails/sleepers fill most of the frame.
         bpy.ops.object.camera_add(location=(0, 0, 2.45), rotation=(0, 0, 0))
         cam = bpy.context.active_object
         bpy.context.scene.camera = cam
