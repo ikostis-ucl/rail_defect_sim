@@ -12,13 +12,13 @@ class DefectSelector:
     Probabilistic dispatcher that decides whether a track section is defective
     and, if so, which pre-cached defect variant to use.
 
-    * DEFECT_PROBABILITY (10%) of sections *start* a defect span.
-    * All registered span-starts are equally likely within that 10%.
+    * ``DEFECT_PROBABILITY`` (10 %) of sections *start* a defect span.
+    * All registered span-starts are equally likely within that 10 %.
     * For multi-section defects (e.g. lateral displacement), follower positions
       are queued automatically so consecutive sections receive the correct part
       of the profile without re-rolling.
 
-    Use DefectSelector.forced(name) to guarantee 100% coverage of one defect
+    Use ``DefectSelector.forced(name)`` to guarantee 100 % coverage of one defect
     type — useful for smoke tests and defect-specific validation renders.
     """
 
@@ -27,6 +27,7 @@ class DefectSelector:
     def __init__(self, seed: Optional[int] = None, *, probability: float | None = None) -> None:
         self._probability = probability if probability is not None else self.DEFECT_PROBABILITY
         self._variants: List[DefectVariant] = []
+        # Maps span-start identifier → ordered list of follower variants
         self._span_followers: dict[str, List[DefectVariant]] = {}
         self._pending_queue: List[DefectVariant] = []
         self._rng: random.Random = random.Random(seed)
@@ -36,7 +37,8 @@ class DefectSelector:
         self.register_span([variant])
 
     def register_span(self, span_variants: List[DefectVariant]) -> None:
-        """Register an ordered span sequence.
+        """
+        Register an ordered span sequence.
 
         Only position 0 enters the selectable pool; positions 1..N-1 are stored
         as followers and queued automatically when the span-start is chosen.
@@ -57,6 +59,7 @@ class DefectSelector:
 
     def select_variant(self) -> Optional[DefectVariant]:
         """Return a defect variant for the next section, or None for a healthy one."""
+        # Drain any queued span followers before rolling for a new defect
         if self._pending_queue:
             return self._pending_queue.pop(0)
         if not self._variants:

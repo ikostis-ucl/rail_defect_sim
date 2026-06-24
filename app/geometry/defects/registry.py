@@ -19,10 +19,12 @@ from app.geometry.defects.rail_displacement import (
 ALL_DEFECTS: List[type[Defect]] = [
     SkewedSleeperDefect,
     MissingFastenerPairDefect,
+    # Single-rail bends
     RightRailLateralDisplacementDefect,
     LeftRailLateralDisplacementDefect,
     LeftRailInwardDisplacementDefect,
     RightRailInwardDisplacementDefect,
+    # Both-rail bends (every direction combination)
     BothRailsGaugeWideningDefect,
     BothRailsGaugeNarrowingDefect,
     BothRailsShiftLeftDefect,

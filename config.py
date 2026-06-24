@@ -79,6 +79,36 @@ def build_parser() -> argparse.ArgumentParser:
             "Useful for smoke tests. E.g. right_rail_lateral_displacement"
         ),
     )
+    parser.add_argument(
+        "--camera-height",
+        type=float,
+        help="Camera height (Z) in metres. Default 2.45.",
+    )
+    parser.add_argument(
+        "--camera-lateral-offset",
+        type=float,
+        help="Camera lateral offset (X) in metres; positive is right of track. Default 0.",
+    )
+    parser.add_argument(
+        "--camera-tilt-deg",
+        type=float,
+        help="Camera tilt in degrees: 0 = straight down (bird's eye), 90 = looking forward. Default 0.",
+    )
+    parser.add_argument(
+        "--camera-yaw-deg",
+        type=float,
+        help="Camera yaw in degrees: pan left/right about the vertical axis. Default 0.",
+    )
+    parser.add_argument(
+        "--camera-roll-deg",
+        type=float,
+        help="Camera roll in degrees: bank about the view axis. Default 0.",
+    )
+    parser.add_argument(
+        "--camera-lens",
+        type=float,
+        help="Camera focal length in mm (lower = wider FOV). Default 35.",
+    )
     return parser
 
 
@@ -108,6 +138,12 @@ def parse_pipeline_settings(argv: list[str] | None = None) -> PipelineSettings:
         "base_speed_units_per_frame": args.base_speed_units_per_frame,
         "geometry_config_path": getattr(args, "geometry_config", None),
         "force_defect": getattr(args, "force_defect", None),
+        "camera_height": args.camera_height,
+        "camera_lateral_offset": args.camera_lateral_offset,
+        "camera_tilt_deg": args.camera_tilt_deg,
+        "camera_yaw_deg": args.camera_yaw_deg,
+        "camera_roll_deg": args.camera_roll_deg,
+        "camera_lens": args.camera_lens,
     }
     filtered_updates = {k: v for k, v in updates.items() if v is not None}
 
