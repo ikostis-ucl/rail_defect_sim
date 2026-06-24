@@ -63,6 +63,17 @@ class Defect(ABC):
     def apply(cls, section: TrackSection, params: dict) -> None:
         """Apply this defect to *section* using the given *params*."""
 
+    @classmethod
+    def span_groups(cls) -> List[List[DefectVariant]]:
+        """
+        Return variants grouped into ordered position sequences (spans).
+
+        Default: each variant is its own single-section span.
+        Multi-section defects override this to return per-span lists ordered
+        position 0 → N-1; DefectSelector queues positions 1..N-1 automatically.
+        """
+        return [[v] for v in cls.variants()]
+
 
 # ---------------------------------------------------------------------------
 # Concrete defect implementations
@@ -113,6 +124,108 @@ class MissingFastenerPairDefect(Defect):
                 section.fasteners.pop(idx)
 
 
+class RightRailLateralDisplacementDefect(Defect):
+    """
+    Right rail displaced laterally outward over a span of consecutive sections.
+
+    The offset profile follows a half-sine arch: zero at both ends of the span,
+    peaking at ``displacement_m`` in the centre.  The outer ballast bed and
+    outer-right fastener pair (indices 6–7) follow the rail so each section
+    looks coherent in isolation.
+    """
+
+    NAME = "right_rail_lateral_displacement"
+    # Peak displacement in metres: mild / moderate / severe
+    DISPLACEMENT_VARIANTS: List[float] = [0.03, 0.06, 0.10]
+    # Number of consecutive sections the defect spans
+    SPAN_LENGTHS: List[int] = [5, 7]
+
+    @classmethod
+    def variants(cls) -> List[DefectVariant]:
+        """All (displacement_m, span_length, position) combinations."""
+        result = []
+        for displacement_m in cls.DISPLACEMENT_VARIANTS:
+            for span_length in cls.SPAN_LENGTHS:
+                for position in range(span_length):
+                    result.append(DefectVariant(
+                        cls.NAME,
+                        {
+                            "displacement_m": displacement_m,
+                            "span_length": span_length,
+                            "position": position,
+                        },
+                        cls,
+                    ))
+        return result
+
+    @classmethod
+    def span_groups(cls) -> List[List[DefectVariant]]:
+        """Variants grouped into ordered position sequences, one group per span."""
+        groups = []
+        for displacement_m in cls.DISPLACEMENT_VARIANTS:
+            for span_length in cls.SPAN_LENGTHS:
+                groups.append([
+                    DefectVariant(
+                        cls.NAME,
+                        {
+                            "displacement_m": displacement_m,
+                            "span_length": span_length,
+                            "position": i,
+                        },
+                        cls,
+                    )
+                    for i in range(span_length)
+                ])
+        return groups
+
+    @classmethod
+    def apply(cls, section: TrackSection, params: dict) -> None:
+        displacement_m = float(params.get("displacement_m", 0.03))
+        span_length = int(params.get("span_length", 5))
+        position = int(params.get("position", 0))
+
+        # Continuous sine along the whole span: t=0 at span start, t=1 at span end.
+        # Each section covers [position/N, (position+1)/N], so adjacent sections
+        # share exactly the same offset at their shared boundary → zero discontinuity.
+        t_entry = position / span_length
+        t_exit = (position + 1) / span_length
+        x_entry = displacement_m * math.sin(math.pi * t_entry)
+        x_exit = displacement_m * math.sin(math.pi * t_exit)
+
+        # Shear the right rail vertices: entry face → x_entry, exit face → x_exit
+        if section.right_rail is not None:
+            cls._bend_mesh_x(section.right_rail, x_entry, x_exit)
+
+        # Translate right ballast rigidly (sleepers stay straight, not bent)
+        if section.right_ballast is not None:
+            section.right_ballast.location.x += (x_entry + x_exit) / 2
+
+        # Outer-right fasteners (indices 6 & 7) are at ±pair_offset_y from section
+        # centre; interpolate their x-offset from the actual y-position within the section.
+        pair_offset_y = max((section.length * section.ballast_length_ratio) * 0.24, 0.02)
+        t6 = 0.5 - pair_offset_y / section.rail_length  # entry-side fastener
+        t7 = 0.5 + pair_offset_y / section.rail_length  # exit-side fastener
+        for idx, t_local in ((6, t6), (7, t7)):
+            if idx < len(section.fasteners):
+                section.fasteners[idx].location.x += x_entry * (1.0 - t_local) + x_exit * t_local
+
+    @classmethod
+    def _bend_mesh_x(cls, obj, x_entry: float, x_exit: float) -> None:
+        """
+        Linearly shear *obj*'s vertices in X along its local Y axis.
+
+        Vertices at local y = -0.5 (entry face) are shifted by *x_entry* in world X;
+        vertices at local y = +0.5 (exit face) by *x_exit*. Intermediate vertices
+        are interpolated. Assumes obj has no rotation (scale-only transform).
+        """
+        scale_x = obj.scale.x
+        for v in obj.data.vertices:
+            t = v.co.y + 0.5          # 0.0 at entry face, 1.0 at exit face
+            dx_world = x_entry * (1.0 - t) + x_exit * t
+            v.co.x += dx_world / scale_x
+        obj.data.update()
+
+
 # ---------------------------------------------------------------------------
 # Registry of all known defect types
 # ---------------------------------------------------------------------------
@@ -121,6 +234,7 @@ class MissingFastenerPairDefect(Defect):
 ALL_DEFECTS: List[type[Defect]] = [
     SkewedBallastDefect,
     MissingFastenerPairDefect,
+    RightRailLateralDisplacementDefect,
 ]
 
 
@@ -132,7 +246,7 @@ ALL_DEFECTS: List[type[Defect]] = [
 class DefectiveSectionCache(SectionCacheBase):
     """Loads and stores reusable defective track section prototypes."""
 
-    CACHE_VERSION = 4
+    CACHE_VERSION = 8
 
     def __init__(self, cache_dir: Path | None = None) -> None:
         project_root = Path(__file__).resolve().parents[2]
@@ -203,28 +317,58 @@ class DefectSelector:
     Probabilistic dispatcher that decides whether a track section is defective
     and, if so, which pre-cached defect variant to use.
 
-    * ``DEFECT_PROBABILITY`` (10 %) of sections receive a defect.
-    * All registered variants are equally likely within that 10 %.
+    * ``DEFECT_PROBABILITY`` (10 %) of sections *start* a defect span.
+    * All registered span-starts are equally likely within that 10 %.
+    * For multi-section defects the follower positions are queued automatically
+      so consecutive sections receive the correct part of the profile.
     """
 
     DEFECT_PROBABILITY: float = 0.10
 
     def __init__(self, seed: Optional[int] = None) -> None:
         self._variants: List[DefectVariant] = []
+        # Maps span-start identifier → ordered list of follower variants
+        self._span_followers: dict[str, List[DefectVariant]] = {}
+        self._pending_queue: List[DefectVariant] = []
         self._rng: random.Random = random.Random(seed)
 
     def register(self, variant: DefectVariant) -> None:
+        """Register a single-section variant."""
         self._variants.append(variant)
 
+    def register_span(self, span_variants: List[DefectVariant]) -> None:
+        """
+        Register an ordered span sequence.
+
+        Only position 0 enters the selectable pool; positions 1..N-1 are stored
+        as followers and queued automatically when the span-start is chosen.
+        """
+        if not span_variants:
+            return
+        start = span_variants[0]
+        self._variants.append(start)
+        if len(span_variants) > 1:
+            self._span_followers[start.identifier] = list(span_variants[1:])
+
     def all_variants(self) -> List[DefectVariant]:
-        return list(self._variants)
+        """Return every variant (span starts + followers) for pre-building caches."""
+        result = list(self._variants)
+        for followers in self._span_followers.values():
+            result.extend(followers)
+        return result
 
     def select_variant(self) -> Optional[DefectVariant]:
         """Return a defect variant for the next section, or None for a healthy one."""
+        # Drain any queued span followers before rolling for a new defect
+        if self._pending_queue:
+            return self._pending_queue.pop(0)
         if not self._variants:
             return None
         if self._rng.random() < self.DEFECT_PROBABILITY:
-            return self._rng.choice(self._variants)
+            chosen = self._rng.choice(self._variants)
+            if chosen.identifier in self._span_followers:
+                self._pending_queue.extend(self._span_followers[chosen.identifier])
+            return chosen
         return None
 
     @classmethod
@@ -232,6 +376,6 @@ class DefectSelector:
         """Create a DefectSelector pre-populated with all known defect variants."""
         selector = cls(seed=seed)
         for defect_class in ALL_DEFECTS:
-            for variant in defect_class.variants():
-                selector.register(variant)
+            for span_group in defect_class.span_groups():
+                selector.register_span(span_group)
         return selector
