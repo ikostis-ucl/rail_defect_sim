@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import List
 
 import bpy
@@ -114,6 +115,7 @@ class TrackSection:
         rail.name = "RailPiece"
         rail.scale = (cfg.rail_width, cfg.section_pitch, cfg.rail_height)
         rail.location = (x + x_offset, y, self._rail_center_z(z))
+        rail.rotation_euler[2] = math.radians(cfg.rail_angle)
         self._register(rail, role=role, collection=collection,
                        parent=self.section_parent, material=self.rail_material)
         return rail

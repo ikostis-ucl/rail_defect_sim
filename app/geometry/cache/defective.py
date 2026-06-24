@@ -12,7 +12,7 @@ from app.geometry.track_section import TrackSection
 class DefectiveSectionCache(SectionCacheBase):
     """Loads and stores reusable defective track section prototypes."""
 
-    CACHE_VERSION = 5  # bumped: TrackSection now uses TrackGeometryConfig; payload keys changed
+    CACHE_VERSION = 6  # bumped: rail_angle field added to TrackGeometryConfig
 
     def __init__(self, cache_dir: Path | None = None) -> None:
         project_root = Path(__file__).resolve().parents[3]

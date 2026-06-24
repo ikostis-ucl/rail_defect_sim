@@ -32,6 +32,12 @@ class TrackGeometryConfig:
     rail_height: float = 0.16
     rail_width: float = 0.06
     rail_lift: float = 0.0        # extra clearance above top-of-sleeper
+    # Rotation of both rails around the vertical (Z) axis, in degrees.
+    # 0 = rails are parallel to the track axis (normal).
+    # Non-zero values tilt the rails in the horizontal plane, e.g.:
+    #   angle=0  →  || | ||   (normal)
+    #   angle=5  →  \\ | \\   (both rails rotated 5° clockwise)
+    rail_angle: float = 0.0
 
     # ── Sleeper (the wooden plank under the rails) ────────────────────────────
     sleeper_length: float = 0.108   # body length along the track axis (Y)

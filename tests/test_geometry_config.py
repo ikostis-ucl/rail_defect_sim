@@ -22,6 +22,10 @@ def test_default_rail_lift():
     assert TrackGeometryConfig().rail_lift == pytest.approx(0.0)
 
 
+def test_default_rail_angle():
+    assert TrackGeometryConfig().rail_angle == pytest.approx(0.0)
+
+
 def test_default_sleeper_length():
     assert TrackGeometryConfig().sleeper_length == pytest.approx(0.108)
 
@@ -103,6 +107,11 @@ def test_to_dict_does_not_include_derived_section_pitch():
     assert "section_pitch" not in d
 
 
+def test_to_dict_includes_rail_angle():
+    cfg = TrackGeometryConfig(rail_angle=5.0)
+    assert cfg.to_dict()["rail_angle"] == pytest.approx(5.0)
+
+
 def test_to_dict_no_ballast_keys():
     d = TrackGeometryConfig().to_dict()
     for key in d:
@@ -150,6 +159,13 @@ def test_from_yaml_empty_file_uses_defaults(tmp_path):
 def test_from_yaml_file_not_found_raises():
     with pytest.raises(FileNotFoundError):
         TrackGeometryConfig.from_yaml("/nonexistent/path/geo.yml")
+
+
+def test_from_yaml_rail_angle(tmp_path):
+    yml = tmp_path / "geo.yml"
+    yml.write_text("rail_angle: 7.5\n")
+    cfg = TrackGeometryConfig.from_yaml(yml)
+    assert cfg.rail_angle == pytest.approx(7.5)
 
 
 def test_from_yaml_section_pitch_recomputed_after_load(tmp_path):

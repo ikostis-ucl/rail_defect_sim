@@ -124,6 +124,29 @@ def test_sleeper_role_constant():
     assert "ballast" not in TrackSection.SLEEPER_ROLE
 
 
+def test_rail_angle_zero_sets_no_rotation():
+    import bpy
+    ts = _section(rail_angle=0.0)
+    ts.section_parent = bpy.context.active_object
+    rail = bpy.context.active_object
+    rail.rotation_euler = [0.0, 0.0, 0.0]
+    ts._create_rail(0.0, (0, 0, 0), role=TrackSection.LEFT_RAIL_ROLE,
+                    collection=bpy.context.scene.collection)
+    assert rail.rotation_euler[2] == pytest.approx(0.0)
+
+
+def test_rail_angle_sets_z_rotation():
+    import math, bpy
+    angle_deg = 5.0
+    ts = _section(rail_angle=angle_deg)
+    ts.section_parent = bpy.context.active_object
+    rail = bpy.context.active_object
+    rail.rotation_euler = [0.0, 0.0, 0.0]
+    ts._create_rail(0.0, (0, 0, 0), role=TrackSection.LEFT_RAIL_ROLE,
+                    collection=bpy.context.scene.collection)
+    assert rail.rotation_euler[2] == pytest.approx(math.radians(angle_deg))
+
+
 def test_all_role_constants_are_strings():
     for attr in ("SECTION_PARENT_ROLE", "LEFT_RAIL_ROLE", "RIGHT_RAIL_ROLE",
                  "SLEEPER_ROLE", "FASTENER_ROLE"):

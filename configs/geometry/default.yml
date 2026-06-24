@@ -12,6 +12,10 @@ rail_spacing: 1.435        # centre-to-centre; UIC standard gauge = 1.435 m
 rail_height: 0.16
 rail_width: 0.06
 rail_lift: 0.0             # extra vertical clearance above top-of-sleeper
+# Rotation of both rails around the vertical axis, in degrees.
+# 0 = rails parallel to the track axis (normal: || | ||).
+# Non-zero = rails tilted in the horizontal plane (e.g. 5° →  \\ | \\).
+rail_angle: 0.0
 
 # ── Sleeper (the wooden plank sitting under the rails) ────────────────────────
 sleeper_length: 0.108      # body length along the track axis (Y), metres
