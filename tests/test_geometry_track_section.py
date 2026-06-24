@@ -4,27 +4,43 @@ No bpy calls are exercised here — the Blender stub satisfies the import.
 """
 import math
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
+from app.config.geometry import TrackGeometryConfig
 from app.geometry.track_section import TrackSection
+
+
+def _cfg(**kw) -> TrackGeometryConfig:
+    return TrackGeometryConfig(**kw)
+
+
+def _section(**kw) -> TrackSection:
+    return TrackSection(config=_cfg(**kw))
+
+
+# ── construction ──────────────────────────────────────────────────────────────
+
+def test_default_construction_uses_default_config():
+    s = TrackSection()
+    assert s.config == TrackGeometryConfig()
+
+
+def test_config_stored_on_instance():
+    cfg = TrackGeometryConfig(rail_spacing=1.6)
+    s = TrackSection(config=cfg)
+    assert s.config is cfg
 
 
 # ── _compute_layout ───────────────────────────────────────────────────────────
 
-def _section(**kw) -> TrackSection:
-    defaults = dict(rail_spacing=1.4, rail_width=0.06, sleeper_height=0.12)
-    defaults.update(kw)
-    return TrackSection(**defaults)
-
-
 def test_layout_rails_are_symmetric_around_center():
-    ts = _section()
+    ts = _section(rail_spacing=1.4)
     layout = ts._compute_layout(0.0)
     assert layout.left_rail_x == pytest.approx(-0.7)
     assert layout.right_rail_x == pytest.approx(0.7)
 
 
 def test_layout_rails_shift_with_center_x():
-    ts = _section()
+    ts = _section(rail_spacing=1.4)
     layout = ts._compute_layout(2.0)
     assert layout.left_rail_x == pytest.approx(2.0 - 0.7)
     assert layout.right_rail_x == pytest.approx(2.0 + 0.7)
@@ -58,53 +74,54 @@ def test_layout_wider_rail_spacing_gives_wider_middle():
 
 # ── geometry_payload ──────────────────────────────────────────────────────────
 
-def test_geometry_payload_contains_all_keys():
+def test_geometry_payload_contains_config_fields():
+    import dataclasses
     ts = TrackSection()
     payload = ts.geometry_payload()
-    expected = {
-        "length", "rail_spacing", "rail_height", "rail_width",
-        "sleeper_height", "rail_lift", "rail_length", "sleeper_length_ratio",
-        "screw_radius", "screw_length",
-    }
-    assert set(payload.keys()) == expected
+    for f in dataclasses.fields(TrackGeometryConfig):
+        assert f.name in payload
 
 
-def test_geometry_payload_values_match_constructor():
-    ts = TrackSection(rail_spacing=1.6, sleeper_height=0.15, sleeper_length_ratio=0.8)
+def test_geometry_payload_no_derived_section_pitch():
+    payload = TrackSection().geometry_payload()
+    assert "section_pitch" not in payload
+
+
+def test_geometry_payload_values_match_config():
+    cfg = TrackGeometryConfig(rail_spacing=1.6, sleeper_height=0.15)
+    ts = TrackSection(config=cfg)
     p = ts.geometry_payload()
     assert p["rail_spacing"] == pytest.approx(1.6)
     assert p["sleeper_height"] == pytest.approx(0.15)
-    assert p["sleeper_length_ratio"] == pytest.approx(0.8)
 
 
 def test_geometry_payload_no_ballast_keys():
-    ts = TrackSection()
-    for key in ts.geometry_payload():
+    for key in TrackSection().geometry_payload():
         assert "ballast" not in key
 
 
 # ── z helpers ─────────────────────────────────────────────────────────────────
 
 def test_sleeper_center_z():
-    ts = TrackSection(sleeper_height=0.12)
+    ts = _section(sleeper_height=0.12)
     assert ts._sleeper_center_z(0.0) == pytest.approx(0.06)
 
 
 def test_sleeper_top_z():
-    ts = TrackSection(sleeper_height=0.12)
+    ts = _section(sleeper_height=0.12)
     assert ts._sleeper_top_z(0.0) == pytest.approx(0.12)
 
 
 def test_rail_center_z_above_sleeper_top():
-    ts = TrackSection(sleeper_height=0.12, rail_height=0.16)
+    ts = _section(sleeper_height=0.12, rail_height=0.16)
     assert ts._rail_center_z(0.0) > ts._sleeper_top_z(0.0)
 
 
 # ── role constants ────────────────────────────────────────────────────────────
 
-def test_role_constants_do_not_contain_ballast():
-    assert "ballast" not in TrackSection.SLEEPER_ROLE
+def test_sleeper_role_constant():
     assert TrackSection.SLEEPER_ROLE == "sleeper"
+    assert "ballast" not in TrackSection.SLEEPER_ROLE
 
 
 def test_all_role_constants_are_strings():

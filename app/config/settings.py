@@ -23,6 +23,7 @@ class PipelineSettings:
     start_frame: int = 1
     track_length: int = 100000
     base_speed_units_per_frame: float = 2.5
+    geometry_config_path: str | None = None  # path to a geometry .yml config file
 
     @property
     def total_frames(self) -> int:

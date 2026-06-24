@@ -1,6 +1,7 @@
 import bpy
 
 from app.config import PipelineSettings
+from app.config.geometry import TrackGeometryConfig
 from app.geometry.cache import TrackSectionCache, DefectiveSectionCache
 from app.geometry.defects import DefectSelector
 from app.geometry.track_section import TrackSection
@@ -18,8 +19,18 @@ class TrackBuilder:
         self.section_cache = TrackSectionCache()
         self.defective_cache = DefectiveSectionCache()
 
+    def _load_geometry_config(self) -> TrackGeometryConfig:
+        path = getattr(self.settings, "geometry_config_path", None)
+        if path:
+            return TrackGeometryConfig.from_yaml(path)
+        return TrackGeometryConfig()
+
     def build(self) -> None:
         print("Modeling geometry (modular approach)...")
+
+        geometry_cfg = self._load_geometry_config()
+        # section_pitch is derived: sleeper_length / sleeper_pitch_ratio
+        section_pitch = geometry_cfg.section_pitch
 
         rail_mat     = self.materials.create_rail_material()
         sleeper_mat  = self.materials.create_sleeper_material()
@@ -27,8 +38,6 @@ class TrackBuilder:
         grass_mat    = self.materials.create_grass_material()
 
         track_length = self.settings.track_length
-        section_spacing = 0.18
-        sleeper_length_ratio = (0.15 * 0.72) / section_spacing
         section_z = 0.1
 
         bpy.ops.mesh.primitive_plane_add(size=1, location=(0, track_length / 2, -0.3))
@@ -37,20 +46,16 @@ class TrackBuilder:
         grass.scale = (100, track_length, 1)
         grass.data.materials.append(grass_mat)
 
-        num_sections = int(track_length / section_spacing) + 1
+        num_sections = int(track_length / section_pitch) + 1
 
-        section_params = dict(
-            length=section_spacing,
-            rail_spacing=1.4,
-            rail_height=0.16,
-            rail_width=0.06,
-            sleeper_height=0.12,
-            rail_length=section_spacing,
-            sleeper_length_ratio=sleeper_length_ratio,
+        prototype_section = TrackSection(
+            config=geometry_cfg,
+            rail_material=rail_mat,
+            sleeper_material=sleeper_mat,
+            fastener_material=fastener_mat,
         )
-
         prototype_collection = self.section_cache.get_or_create_prototype_collection(
-            TrackSection(**section_params)
+            prototype_section
         )
         TrackSection.apply_materials_to_collection(
             prototype_collection,
@@ -71,7 +76,7 @@ class TrackBuilder:
         defective_collections = {}
         for variant in defect_selector.all_variants():
             defective_col = self.defective_cache.get_or_create_defective_collection(
-                TrackSection(**section_params),
+                TrackSection(config=geometry_cfg),
                 variant,
             )
             TrackSection.apply_materials_to_collection(
@@ -91,7 +96,7 @@ class TrackBuilder:
             total=num_sections,
             unit="section",
         ):
-            y_pos = i * section_spacing
+            y_pos = i * section_pitch
             if y_pos > track_length:
                 break
 

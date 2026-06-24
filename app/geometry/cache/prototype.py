@@ -12,7 +12,7 @@ from app.geometry.track_section import TrackSection
 class TrackSectionCache(SectionCacheBase):
     """Loads and stores reusable modular track section prototypes."""
 
-    CACHE_VERSION = 16  # bumped: hash encoding changed to str-normalised
+    CACHE_VERSION = 17  # bumped: TrackSection now uses TrackGeometryConfig; payload keys changed
 
     def __init__(self, cache_dir: Path | None = None) -> None:
         project_root = Path(__file__).resolve().parents[3]
