@@ -209,3 +209,6 @@ __marimo__/
 # Data files and generated caches
 /data/
 /assets/
+
+# Archived landing-page media (superseded videos kept locally, not published)
+/docs/media_archive/

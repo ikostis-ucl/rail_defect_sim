@@ -9,10 +9,23 @@
 #   blender --background --python run_video_gen.py -- --config configs/camera/windshield.yml
 #
 # Angles in degrees. Distances in metres. tilt: 0 = down, 90 = horizontal forward.
+#
+# camera-height is a world-Z value, not "height above rail" (see the TODO in
+# app/camera/camera_animator.py) — it must be manually offset by the top-of-rail
+# world Z, which is 0.466 m with the default Camrail/UIC54 geometry these
+# cameroon_* scripts use. If you render with a different --geometry-config,
+# recompute this offset or the camera will sit at the wrong height above rail.
+#
+# Driver eye-height isn't one of the two figures given (Siemens engine ~4.3 m
+# overall, buffer ~1.0 m above rail) — it's estimated from them: cab floor sits
+# a bit above the buffer beam (~1.4 m above rail), plus a seated/elevated
+# driver's eye offset of ~1.9 m, landing eye-level at ~3.3 m above rail. That
+# leaves ~1.0 m of headroom to the 4.3 m roofline, which is a plausible cab
+# interior. Revise this if you have the actual cab drawing.
 
-camera-height: 3.0           # ~cab height above the rail
+camera-height: 3.77          # ~3.3 m estimated driver eye-height above rail + 0.466 m rail-top datum
 camera-lateral-offset: 0.0   # centred on the track
 camera-tilt-deg: 84.0        # looking forward, slightly down onto the track
 camera-yaw-deg: 0.0          # straight ahead
 camera-roll-deg: 0.0
-camera-lens: 35              # natural ~50mm-equivalent perspective
+camera-lens: 85              # ~24° horizontal FOV (36mm sensor) — short telephoto, crops in tight on the track and cuts the empty ground on either side

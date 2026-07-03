@@ -8,10 +8,16 @@
 #   blender --background --python run_video_gen.py -- --config configs/camera/roof_far.yml
 #
 # Angles in degrees. Distances in metres. tilt: 0 = down, 90 = horizontal forward.
+#
+# camera-height is a world-Z value, not "height above rail" (see the TODO in
+# app/camera/camera_animator.py) — it must be manually offset by the top-of-rail
+# world Z, which is 0.466 m with the default Camrail/UIC54 geometry these
+# cameroon_* scripts use. If you render with a different --geometry-config,
+# recompute this offset or the camera will sit at the wrong height above rail.
 
-camera-height: 4.5           # wagon-roof height
+camera-height: 4.77          # Siemens engine wagon height ~4.3 m above rail + 0.466 m rail-top datum
 camera-lateral-offset: 0.0   # centred on the track
 camera-tilt-deg: 88.0        # nearly horizontal, gazing toward the horizon
 camera-yaw-deg: 0.0
 camera-roll-deg: 0.0
-camera-lens: 50              # mild telephoto — compresses the long view
+camera-lens: 85              # matches windshield.yml — ~24° horizontal FOV (36mm sensor), short telephoto

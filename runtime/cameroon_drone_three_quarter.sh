@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cameroon metre-gauge · roof far view · 10 s @ 10 fps · slow pass
+# Cameroon metre-gauge · drone three-quarter view · 10 s @ 10 fps · slow pass
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,7 +10,7 @@ exec "$BLENDER_BIN" \
   --background \
   --python "$PROJECT_ROOT/run_video_gen.py" \
   -- \
-  --config "$PROJECT_ROOT/configs/camera/roof_far.yml" \
+  --config "$PROJECT_ROOT/configs/camera/drone_three_quarter.yml" \
   --fps 10 \
   --duration-seconds 1 \
   --resolution-x 960 \

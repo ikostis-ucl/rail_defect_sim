@@ -157,15 +157,30 @@ def test_apply_shifts_fasteners_6_and_7():
     assert section.fasteners[6].location.x != original_x6 or section.fasteners[7].location.x != original_x7
 
 
-def test_apply_does_not_shift_inner_fasteners():
-    # Fasteners 0-5 should be untouched
+def test_apply_does_not_shift_left_rail_fasteners():
+    # Right-rail defect must not move any left-rail fastener (indices 0-3:
+    # [0,1]=outer-left, [2,3]=inner-left).
     section = _make_section()
-    original = [f.location.x for f in section.fasteners[:6]]
+    original = [f.location.x for f in section.fasteners[:4]]
     RightRailLateralDisplacementDefect.apply(section, {
         "displacement_m": 0.10, "span_length": 5, "position": 2,
     })
-    for i in range(6):
+    for i in range(4):
         assert section.fasteners[i].location.x == original[i]
+
+
+def test_apply_shifts_both_right_rail_fastener_pairs_together():
+    # Both fastener pairs seated on the right rail ([4,5]=inner, [6,7]=outer)
+    # clip the same moving rail foot, so both must shift — and by the same
+    # amount, since they share the same y-offset-from-center pattern.
+    section = _make_section()
+    RightRailLateralDisplacementDefect.apply(section, {
+        "displacement_m": 0.10, "span_length": 5, "position": 2,
+    })
+    assert section.fasteners[4].location.x != 0.0
+    assert section.fasteners[5].location.x != 0.0
+    assert section.fasteners[4].location.x == section.fasteners[6].location.x
+    assert section.fasteners[5].location.x == section.fasteners[7].location.x
 
 
 def test_apply_larger_displacement_gives_larger_shift():

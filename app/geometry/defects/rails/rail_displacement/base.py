@@ -15,22 +15,25 @@ class RailDisplacementDefect(Defect):
     Each rail named in ``BENDS`` is sheared along a half-sine arch — zero at both
     ends of the span, peaking at ``displacement_m`` in the centre — so the bend is
     continuous across section boundaries. The merged monoblock sleeper stays fixed
-    (a concrete sleeper does not follow individual rail movement); only the rail
-    mesh and the outer fastener pair are displaced.
+    (a concrete sleeper does not follow individual rail movement); the rail mesh
+    and *both* fastener pairs seated on that rail (inner and outer) are displaced
+    together, since both pairs clip the same moving rail foot.
 
     Subclasses set ``NAME`` and ``BENDS``: a list of ``(side, sign)`` tuples where
     ``side`` is ``"left"``/``"right"`` and ``sign`` is ``+1`` for +X or ``-1`` for -X.
     One tuple bends a single rail; two tuples bend both rails at once.
     """
 
-    DISPLACEMENT_VARIANTS: List[float] = [0.03, 0.06, 0.10]
+    DISPLACEMENT_VARIANTS: List[float] = [0.015, 0.03, 0.05]
     SPAN_LENGTHS: List[int] = [5, 7]
     BENDS: List[tuple] = []
 
-    # side → (rail attr, (entry-fastener idx, exit-fastener idx))
+    # side → (rail attr, ((outer entry-idx, outer exit-idx), (inner entry-idx, inner exit-idx)))
+    # Fastener layout per TrackSection._create_fasteners: [0,1]=outer-left,
+    # [2,3]=inner-left, [4,5]=inner-right, [6,7]=outer-right.
     _SIDE_OBJECTS = {
-        "left":  ("left_rail",  (0, 1)),
-        "right": ("right_rail", (6, 7)),
+        "left":  ("left_rail",  ((0, 1), (2, 3))),
+        "right": ("right_rail", ((6, 7), (4, 5))),
     }
 
     @classmethod
@@ -90,7 +93,7 @@ class RailDisplacementDefect(Defect):
         x_entry = sign * displacement_m * math.sin(math.pi * t_entry)
         x_exit  = sign * displacement_m * math.sin(math.pi * t_exit)
 
-        rail_attr, (entry_idx, exit_idx) = cls._SIDE_OBJECTS[side]
+        rail_attr, fastener_pairs = cls._SIDE_OBJECTS[side]
         rail = getattr(section, rail_attr, None)
 
         if rail is not None:
@@ -98,14 +101,17 @@ class RailDisplacementDefect(Defect):
         # The merged monoblock sleeper stays fixed — a rigid concrete sleeper
         # does not follow individual rail lateral movement.
 
-        # Outer fasteners: interpolate by their y-position within the section
+        # Both fastener pairs on this rail (inner and outer) follow it: they
+        # clip the same moving rail foot, so both must track the bend.
+        # Interpolate by each fastener's y-position within the section.
         pair_offset_y = max(cfg.sleeper_depth * 0.24, 0.02)
         t_near = 0.5 - pair_offset_y / cfg.section_pitch
         t_far  = 0.5 + pair_offset_y / cfg.section_pitch
-        for idx, t_local in ((entry_idx, t_near), (exit_idx, t_far)):
-            if idx < len(section.fasteners):
-                section.fasteners[idx].location.x += (
-                    x_entry * (1.0 - t_local) + x_exit * t_local
+        for entry_idx, exit_idx in fastener_pairs:
+            for idx, t_local in ((entry_idx, t_near), (exit_idx, t_far)):
+                if idx < len(section.fasteners):
+                    section.fasteners[idx].location.x += (
+                        x_entry * (1.0 - t_local) + x_exit * t_local
                 )
 
     @classmethod

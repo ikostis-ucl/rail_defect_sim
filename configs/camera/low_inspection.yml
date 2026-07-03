@@ -1,17 +1,25 @@
 # tsv-twin camera placement — LOW INSPECTION (rail level)
 #
 # Dramatic low, rail-level view looking forward down the track — as if a camera
-# rode just above the railhead on an inspection bogie. The wide lens exaggerates
-# the rails rushing past and makes defects in the near field very prominent.
+# rode on the front bumper/coupler of the locomotive, an inspection-camera
+# mounting point real railways actually use. The wide lens exaggerates the
+# rails rushing past and makes defects in the near field very prominent.
 #
 # Pass at runtime with:
 #   blender --background --python run_video_gen.py -- --config configs/camera/low_inspection.yml
 #
 # Angles in degrees. Distances in metres. tilt: 0 = down, 90 = horizontal forward.
+#
+# camera-height is a world-Z value, not "height above rail" (see the TODO in
+# app/camera/camera_animator.py) — it must be manually offset by the top-of-rail
+# world Z, which is 0.466 m with the default Camrail/UIC54 geometry these
+# cameroon_* scripts use (sleeper base 0.1 + sleeper height 0.200 + pad 0.007 +
+# rail height 0.159). If you render with a different --geometry-config, recompute
+# this offset or the camera will sit at the wrong height above rail.
 
-camera-height: 0.6           # just above the railhead
+camera-height: 1.47          # Siemens buffer/bumper height ~1.0 m above rail + 0.466 m rail-top datum
 camera-lateral-offset: 0.0   # centred between the rails
 camera-tilt-deg: 85.0        # looking forward, slightly down
 camera-yaw-deg: 0.0
 camera-roll-deg: 0.0
-camera-lens: 28              # wide angle — dramatic, exaggerated perspective
+camera-lens: 70              # ~29° horizontal FOV (36mm sensor) — visible ground width at any given distance is half of the 35mm/~54° version (halving tan(FOV/2), not the angle itself)

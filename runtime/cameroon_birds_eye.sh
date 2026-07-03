@@ -12,7 +12,7 @@ exec "$BLENDER_BIN" \
   -- \
   --config "$PROJECT_ROOT/configs/camera/birds_eye.yml" \
   --fps 24 \
-  --duration-seconds 10 \
+  --duration-seconds 1 \
   --resolution-x 960 \
   --resolution-y 540 \
   --render-engine BLENDER_EEVEE \
