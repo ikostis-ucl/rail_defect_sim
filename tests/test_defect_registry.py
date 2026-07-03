@@ -1,7 +1,7 @@
 from app.geometry.defects.registry import ALL_DEFECTS
 from app.geometry.defects.base import Defect
-from app.geometry.defects.skewed_sleeper import SkewedSleeperDefect
-from app.geometry.defects.missing_fastener import MissingFastenerPairDefect
+from app.geometry.defects.sleepers import SkewedSleeperDefect
+from app.geometry.defects.fasteners import MissingFastenerPairDefect
 
 
 def test_all_defects_is_nonempty():

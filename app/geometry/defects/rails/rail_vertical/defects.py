@@ -1,4 +1,4 @@
-from app.geometry.defects.rail_vertical.base import RailVerticalDisplacementDefect
+from app.geometry.defects.rails.rail_vertical.base import RailVerticalDisplacementDefect
 
 
 class LeftRailVerticalBumpDefect(RailVerticalDisplacementDefect):

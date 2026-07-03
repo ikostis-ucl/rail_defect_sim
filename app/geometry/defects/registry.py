@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import List
 
 from app.geometry.defects.base import Defect
-from app.geometry.defects.skewed_sleeper import SkewedSleeperDefect
-from app.geometry.defects.missing_fastener import MissingFastenerPairDefect
-from app.geometry.defects.rail_displacement import (
+from app.geometry.defects.sleepers import SkewedSleeperDefect
+from app.geometry.defects.fasteners import MissingFastenerPairDefect
+from app.geometry.defects.rails import (
     RightRailLateralDisplacementDefect,
     LeftRailLateralDisplacementDefect,
     LeftRailInwardDisplacementDefect,
@@ -14,8 +14,6 @@ from app.geometry.defects.rail_displacement import (
     BothRailsGaugeNarrowingDefect,
     BothRailsShiftLeftDefect,
     BothRailsShiftRightDefect,
-)
-from app.geometry.defects.rail_vertical import (
     LeftRailVerticalBumpDefect,
     RightRailVerticalBumpDefect,
     BothRailsVerticalBumpDefect,

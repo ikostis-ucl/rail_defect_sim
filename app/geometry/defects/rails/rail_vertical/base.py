@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-from app.geometry.defects.rail_displacement.base import RailDisplacementDefect
+from app.geometry.defects.rails.rail_displacement.base import RailDisplacementDefect
 from app.geometry.track_section import TrackSection
 
 

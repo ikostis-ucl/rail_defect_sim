@@ -161,7 +161,7 @@
     content: ""; position: absolute; right: -14px; top: 4px;
     width: 11px; height: 1px; background: var(--amber);
   }
-  @keyframes scroll-y { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+  @keyframes scroll-y { from { transform: translateY(-50%); } to { transform: translateY(0); } }
   @media (prefers-reduced-motion: reduce) {
     .td-strip { animation: none; }
   }
@@ -186,6 +186,12 @@
   .card .ico { width: 34px; height: 34px; margin-bottom: 14px; color: var(--amber); overflow: visible; }
   .card h3 { font-size: 1.12rem; }
   .card p { color: var(--ink-soft); margin: 0; font-size: .96rem; }
+  /* icon + title (+ short subtitle) share one row, saving the vertical space
+     the icon used to take stacked on its own above the title */
+  .card-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+  .card-head .ico { margin-bottom: 0; flex: 0 0 auto; }
+  .card-head-text h3 { margin: 0; }
+  .card-head-text p { margin: 2px 0 0; font-size: .82rem; color: var(--ink-dim); }
 
   /* Approach-tile sketches — small looping animations that act out each
      card's concept, in the same continuous-ambient-motion register as the
@@ -253,8 +259,68 @@
     100%     { transform: translateY(11px); opacity: 0; }
   }
 
+  /* Defect-catalogue component-tile sketches — same continuous-ambient
+     register as the Approach tiles. The two placeholder components (ground,
+     ballast) get a shared "dormant" breathing pulse instead of an active
+     defect motion, since there's nothing there yet to act out. */
+  .sketch-rails-cat .sk-rail-sway {
+    transform-box: view-box;
+    animation: sk-cat-sway 2.6s ease-in-out infinite;
+  }
+  @keyframes sk-cat-sway { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
+  .sketch-rails-cat .sk-rail-bump {
+    transform-box: view-box;
+    animation: sk-cat-bump 2.6s ease-in-out infinite; animation-delay: .3s;
+  }
+  @keyframes sk-cat-bump { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+  .sketch-fasteners-cat .sk-dot { animation: sk-dot-blink 3.2s ease-in-out infinite; }
+  .sketch-fasteners-cat .sk-dot-1 { animation-delay: 0s; }
+  .sketch-fasteners-cat .sk-dot-2 { animation-delay: .3s; }
+  .sketch-fasteners-cat .sk-dot-3 { animation-delay: .6s; }
+  .sketch-fasteners-cat .sk-dot-4 { animation-delay: .9s; }
+  @keyframes sk-dot-blink { 0%, 60%, 100% { opacity: 1; } 30% { opacity: .15; } }
+
+  .sketch-sleepers-cat .sk-sleeper-skew {
+    transform-box: view-box; transform-origin: 50% 50%;
+    animation: sk-sleeper-skew 3s ease-in-out infinite;
+  }
+  @keyframes sk-sleeper-skew {
+    0%, 20%  { transform: rotate(0deg); }
+    50%      { transform: rotate(-8deg); }
+    80%, 100% { transform: rotate(0deg); }
+  }
+
+  .sketch-ground-cat, .sketch-ballast-cat { animation: sk-cat-dormant 3.2s ease-in-out infinite; }
+  @keyframes sk-cat-dormant { 0%, 100% { opacity: .32; } 50% { opacity: .75; } }
+
+  .sketch-grow-cat .sk-plus {
+    transform-box: view-box; transform-origin: 12px 12px;
+    animation: sk-plus-pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes sk-plus-pulse { 0%, 100% { transform: scale(1); opacity: .7; } 50% { transform: scale(1.25); opacity: 1; } }
+
+  .card .defects { grid-template-columns: 1fr; gap: 8px; margin-top: 14px; }
+  .card .defect { padding: 10px 12px; font-size: .87rem; }
+  .cat-empty-note { color: var(--ink-dim); font-style: italic; }
+  .rail-groups {
+    margin-top: 14px; max-height: 280px; overflow-y: auto; padding-right: 8px;
+    scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+  }
+  .rail-groups::-webkit-scrollbar { width: 6px; }
+  .rail-groups::-webkit-scrollbar-track { background: transparent; }
+  .rail-groups::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+  .rail-groups::-webkit-scrollbar-thumb:hover { background: var(--steel); }
+  .rail-group + .rail-group { margin-top: 16px; }
+  .rail-group-label {
+    font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--steel); margin-bottom: 6px;
+  }
+  .rail-group .defects { margin-top: 0; }
+
   @media (prefers-reduced-motion: reduce) {
     .card .ico * { animation: none; }
+    .sketch-ground-cat, .sketch-ballast-cat { animation: none; }
   }
 
   /* Output gallery — one card per camera rig */
@@ -369,7 +435,7 @@
 <section class="hero" style="border-top:none;">
   <div class="hero-bg" aria-hidden="true"></div>
   <div class="wrap hero-inner">
-    <h1>Procedural railway video, engineered for defect-detection AI.</h1>
+    <h1>Procedural Railway Video, Engineered for Defect-Detection AI.</h1>
     <p class="lede">
       TSV&nbsp;Twin is an <strong>open digital twin of railway track</strong>. It builds the track section by
       section, grounded in real rail-profile standards, and flies a camera over it to render synthetic video
@@ -449,7 +515,7 @@
   <div class="wrap">
     <div class="section-head">
       <div class="kicker">The problem</div>
-      <h2>Real inspection footage is scarce, skewed, and locked away</h2>
+      <h2>Real Inspection Footage is Scarce, Skewed, and Locked Away:</h2>
       <p>
         Automated railway defect detection lives or dies by its training data, and that data barely exists.
         Public imagery is heavily skewed toward rail-surface faults like <b>squats</b>, <b>shellings</b> and <b>cracks</b>, because
@@ -478,7 +544,7 @@
   <div class="wrap">
     <div class="section-head">
       <div class="kicker">The approach</div>
-      <h2>An open digital twin, generated from open data</h2>
+      <h2>An Open Digital Twin, Generated from Open Data:</h2>
       <p>
         TSV&nbsp;Twin builds railway track <b>procedurally</b> in Blender and deforms it in physically-motivated ways,
         so the position, type and severity of every defect is chosen by the pipeline and therefore known
@@ -489,61 +555,73 @@
 
     <div class="grid cols-3">
       <div class="card">
-        <svg class="ico sketch sketch-track" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <rect x="3" y="15.2" width="18" height="2.6" rx="1"/>
-          <rect class="sk-rail sk-rail-l" x="6.2" y="4" width="2.4" height="12" rx="1"/>
-          <rect class="sk-rail sk-rail-r" x="15.4" y="4" width="2.4" height="12" rx="1"/>
-        </svg>
-        <h3>Parametric track geometry</h3>
+        <div class="card-head">
+          <svg class="ico sketch sketch-track" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <rect x="3" y="15.2" width="18" height="2.6" rx="1"/>
+            <rect class="sk-rail sk-rail-l" x="6.2" y="4" width="2.4" height="12" rx="1"/>
+            <rect class="sk-rail sk-rail-r" x="15.4" y="4" width="2.4" height="12" rx="1"/>
+          </svg>
+          <div class="card-head-text"><h3>Parametric Track Geometry:</h3></div>
+        </div>
         <p>Track is assembled from cached H-shaped sections (rails, sleepers, fasteners and clips), validated against real rail-profile standards (UIC54, UIC60, AREMA 115RE). Change the config, get a different, dimensionally-faithful stretch of track.</p>
       </div>
       <div class="card">
-        <svg class="ico sketch sketch-defect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <circle cx="12" cy="12" r="9"/>
-          <path class="sk-needle" d="M12 12 L12 5.8"/>
-          <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/>
-        </svg>
-        <h3>Geometry defects on demand</h3>
+        <div class="card-head">
+          <svg class="ico sketch sketch-defect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="12" cy="12" r="9"/>
+            <path class="sk-needle" d="M12 12 L12 5.8"/>
+            <circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/>
+          </svg>
+          <div class="card-head-text"><h3>Geometry Defects on Demand:</h3></div>
+        </div>
         <p>A registry of 13 physically-motivated deformations (gauge widening and narrowing, lateral and inward shift, vertical bumps, missing fasteners), the operationally serious, data-starved category. Injected probabilistically or forced.</p>
       </div>
       <div class="card">
-        <svg class="ico sketch sketch-truth" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <rect x="3" y="5" width="18" height="14" rx="2"/>
-          <path class="sk-cross" d="M3 10h18M8 5v14"/>
-        </svg>
-        <h3>Ground truth for free</h3>
+        <div class="card-head">
+          <svg class="ico sketch sketch-truth" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <rect x="3" y="5" width="18" height="14" rx="2"/>
+            <path class="sk-cross" d="M3 10h18M8 5v14"/>
+          </svg>
+          <div class="card-head-text"><h3>Ground Truth for Free:</h3></div>
+        </div>
         <p>Because the scene is generated, every defect's location and class is known by construction: no manual labelling, no ambiguity, and rare cases on tap.</p>
       </div>
       <div class="card">
-        <svg class="ico sketch sketch-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <g class="sk-ghost sk-ghost-2"><path d="M4 17V7a2 2 0 012-2h9l5 5v7a2 2 0 01-2 2H6a2 2 0 01-2-2z"/></g>
-          <g class="sk-ghost sk-ghost-1"><path d="M4 17V7a2 2 0 012-2h9l5 5v7a2 2 0 01-2 2H6a2 2 0 01-2-2z"/></g>
-          <path d="M4 17V7a2 2 0 012-2h9l5 5v7a2 2 0 01-2 2H6a2 2 0 01-2-2z"/>
-          <path d="M15 5v4h4"/>
-        </svg>
-        <h3>Repeatable presets</h3>
+        <div class="card-head">
+          <svg class="ico sketch sketch-repeat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <g class="sk-ghost sk-ghost-2"><path d="M4 17V7a2 2 0 012-2h9l5 5v7a2 2 0 01-2 2H6a2 2 0 01-2-2z"/></g>
+            <g class="sk-ghost sk-ghost-1"><path d="M4 17V7a2 2 0 012-2h9l5 5v7a2 2 0 01-2 2H6a2 2 0 01-2-2z"/></g>
+            <path d="M4 17V7a2 2 0 012-2h9l5 5v7a2 2 0 01-2 2H6a2 2 0 01-2-2z"/>
+            <path d="M15 5v4h4"/>
+          </svg>
+          <div class="card-head-text"><h3>Repeatable Presets:</h3></div>
+        </div>
         <p>From 640×360 drafts to 4K production runs, one command each. Deterministic output makes a growing, balanced dataset easy to assemble over time.</p>
       </div>
       <div class="card">
-        <svg class="ico sketch sketch-material" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <path class="sk-beam" d="M12 3v6"/>
-          <path d="M5 8l7-5 7 5"/>
-          <circle cx="12" cy="14" r="3.4"/>
-          <circle class="sk-glint" cx="10.4" cy="12.4" r="0.9" fill="currentColor" stroke="none"/>
-        </svg>
-        <h3>Physically-based materials</h3>
+        <div class="card-head">
+          <svg class="ico sketch sketch-material" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path class="sk-beam" d="M12 3v6"/>
+            <path d="M5 8l7-5 7 5"/>
+            <circle cx="12" cy="14" r="3.4"/>
+            <circle class="sk-glint" cx="10.4" cy="12.4" r="0.9" fill="currentColor" stroke="none"/>
+          </svg>
+          <div class="card-head-text"><h3>Physically-Based Materials:</h3></div>
+        </div>
         <p>Rails, sleepers, ballast and fasteners carry procedural PBR shading (metallic response, roughness, surface detail), so light behaves as it does on oxidised steel and weathered concrete, not a flat photo.</p>
       </div>
       <div class="card">
-        <svg class="ico sketch sketch-cache" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <defs>
-            <clipPath id="sk-cache-clip"><rect x="3" y="4" width="18" height="14" rx="2"/></clipPath>
-          </defs>
-          <rect x="3" y="4" width="18" height="14" rx="2"/>
-          <path d="M8 21h8M12 18v3"/>
-          <rect class="sk-scan" x="3" y="4" width="18" height="3" fill="currentColor" stroke="none" opacity=".35" clip-path="url(#sk-cache-clip)"/>
-        </svg>
-        <h3>Cached &amp; headless</h3>
+        <div class="card-head">
+          <svg class="ico sketch sketch-cache" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <defs>
+              <clipPath id="sk-cache-clip"><rect x="3" y="4" width="18" height="14" rx="2"/></clipPath>
+            </defs>
+            <rect x="3" y="4" width="18" height="14" rx="2"/>
+            <path d="M8 21h8M12 18v3"/>
+            <rect class="sk-scan" x="3" y="4" width="18" height="3" fill="currentColor" stroke="none" opacity=".35" clip-path="url(#sk-cache-clip)"/>
+          </svg>
+          <div class="card-head-text"><h3>Cached &amp; Headless:</h3></div>
+        </div>
         <p>Section prototypes are built once and reused, with automatic source-fingerprint versioning: edit the geometry and stale assets rebuild themselves. Runs headless in Blender's <span class="mono">bpy</span>, with an ffmpeg fallback to MP4.</p>
       </div>
     </div>
@@ -555,7 +633,7 @@
   <div class="wrap">
     <div class="section-head">
       <div class="kicker">Output</div>
-      <h2>See it in motion!</h2>
+      <h2>See it in Motion!</h2>
       <p>The same procedurally generated track, filmed from four camera rigs the pipeline ships with. These are short draft renders, placeholders until higher-resolution sequences land, but the geometry, materials and defects are the real output.</p>
     </div>
 
@@ -593,24 +671,112 @@
   <div class="wrap">
     <div class="section-head">
       <div class="kicker">Defect catalogue</div>
-      <h2>Thirteen defect types, all ground-truth labelled</h2>
-      <p>Track-geometry deviations are the category public datasets miss, and the one this project targets first. Each defect is a physically-motivated deformation: rail-displacement types bend the rail along a smooth half-sine arch across several sections, so the bend is continuous and realistic rather than a single kinked vertex.</p>
+      <h2>Thirteen Defect Types, Grouped by Component:</h2>
+      <p>The defect registry mirrors the physical structure of the track: rails, fasteners, sleepers, ballast and ground each get their own slot in the catalogue. Each defect is a physically-motivated deformation: rail-displacement types bend the rail along a smooth half-sine arch across several sections, so the bend is continuous and realistic rather than a single kinked vertex.</p>
     </div>
 
-    <div class="defects">
-      <div class="defect"><span class="dot"></span><div>Skewed sleeper <code>skewed_sleeper</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Missing fastener pair <code>missing_fastener_pair</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Right rail lateral displacement <code>right_rail_lateral_displacement</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Left rail lateral displacement <code>left_rail_lateral_displacement</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Left rail inward displacement <code>left_rail_inward_displacement</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Right rail inward displacement <code>right_rail_inward_displacement</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Both rails gauge widening <code>both_rails_gauge_widening</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Both rails gauge narrowing <code>both_rails_gauge_narrowing</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Both rails shift left <code>both_rails_shift_left</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Both rails shift right <code>both_rails_shift_right</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Left rail vertical bump <code>left_rail_vertical_bump</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Right rail vertical bump <code>right_rail_vertical_bump</code></div></div>
-      <div class="defect"><span class="dot"></span><div>Both rails vertical bump <code>both_rails_vertical_bump</code></div></div>
+    <div class="grid cols-3">
+      <div class="card">
+        <div class="card-head">
+          <svg class="ico sketch sketch-rails-cat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <rect class="sk-rail-sway" x="4" y="4" width="2.6" height="16" rx="1"/>
+            <rect class="sk-rail-bump" x="17" y="4" width="2.6" height="16" rx="1"/>
+          </svg>
+          <div class="card-head-text"><h3>Rails:</h3><p>11 defect types</p></div>
+        </div>
+        <div class="rail-groups">
+          <details class="rail-group">
+            <summary class="rail-group-label">Displacement</summary>
+            <div class="defects">
+              <div class="defect"><span class="dot"></span><div>Right Rail Lateral</div></div>
+              <div class="defect"><span class="dot"></span><div>Left Rail Lateral</div></div>
+              <div class="defect"><span class="dot"></span><div>Left Rail Inward</div></div>
+              <div class="defect"><span class="dot"></span><div>Right Rail Inward</div></div>
+            </div>
+          </details>
+          <details class="rail-group">
+            <summary class="rail-group-label">Gauge</summary>
+            <div class="defects">
+              <div class="defect"><span class="dot"></span><div>Widening</div></div>
+              <div class="defect"><span class="dot"></span><div>Narrowing</div></div>
+            </div>
+          </details>
+          <details class="rail-group">
+            <summary class="rail-group-label">Shift</summary>
+            <div class="defects">
+              <div class="defect"><span class="dot"></span><div>Left</div></div>
+              <div class="defect"><span class="dot"></span><div>Right</div></div>
+            </div>
+          </details>
+          <details class="rail-group">
+            <summary class="rail-group-label">Bumps</summary>
+            <div class="defects">
+              <div class="defect"><span class="dot"></span><div>Left rail</div></div>
+              <div class="defect"><span class="dot"></span><div>Right rail</div></div>
+              <div class="defect"><span class="dot"></span><div>Both rails</div></div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <svg class="ico sketch sketch-fasteners-cat" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <circle class="sk-dot sk-dot-1" cx="8" cy="8" r="2"/>
+            <circle class="sk-dot sk-dot-2" cx="8" cy="16" r="2"/>
+            <circle class="sk-dot sk-dot-3" cx="16" cy="8" r="2"/>
+            <circle class="sk-dot sk-dot-4" cx="16" cy="16" r="2"/>
+          </svg>
+          <div class="card-head-text"><h3>Fasteners:</h3><p>1 defect type</p></div>
+        </div>
+        <div class="defects">
+          <div class="defect"><span class="dot"></span><div>Missing Fastener Pair</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <svg class="ico sketch sketch-sleepers-cat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <rect class="sk-sleeper-skew" x="3" y="10.5" width="18" height="3" rx="1"/>
+          </svg>
+          <div class="card-head-text"><h3>Sleepers:</h3><p>1 defect type</p></div>
+        </div>
+        <div class="defects">
+          <div class="defect"><span class="dot"></span><div>Skewed Sleeper</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <svg class="ico sketch sketch-ballast-cat" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <circle cx="5" cy="16" r="1.6"/><circle cx="10" cy="13" r="2"/><circle cx="15" cy="17" r="1.8"/>
+            <circle cx="19" cy="12" r="1.4"/><circle cx="8" cy="8" r="1.5"/><circle cx="16" cy="7" r="1.7"/>
+          </svg>
+          <div class="card-head-text"><h3>Ballast:</h3></div>
+        </div>
+        <p class="cat-empty-note">Reserved: no ballast geometry yet, so no defects to place on it.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <svg class="ico sketch sketch-ground-cat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 2.4">
+            <path d="M3 9h18M3 14h18M3 19h18"/>
+          </svg>
+          <div class="card-head-text"><h3>Ground:</h3></div>
+        </div>
+        <p class="cat-empty-note">Reserved: no subgrade geometry yet, so no defects to place on it.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <svg class="ico sketch sketch-grow-cat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="12" cy="12" r="9"/>
+            <path class="sk-plus" d="M12 8v8M8 12h8"/>
+          </svg>
+          <div class="card-head-text"><h3>More TBA!</h3></div>
+        </div>
+        <p>Thirteen today, more on the way. Ballast and ground are already reserved as components; new defect types slot in per-component without touching the rest of the registry.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -620,7 +786,7 @@
   <div class="wrap">
     <div class="section-head">
       <div class="kicker">Grounded</div>
-      <h2>Built on open standards and open data</h2>
+      <h2>Built on Open Standards and Open Data:</h2>
       <p>None of this is invented from thin air. The geometry follows published rail standards, and the realism draws on open-access railway datasets: the same sources that let synthetic footage stand in for the real thing.</p>
     </div>
 
@@ -650,16 +816,16 @@
   <div class="wrap">
     <div class="section-head">
       <div class="kicker">How it works</div>
-      <h2>One pass: From empty scene to annotated MP4</h2>
+      <h2>One Pass: From Empty Scene to Annotated MP4.</h2>
       <p>The whole run is a single execution path orchestrated by the render pipeline.</p>
     </div>
 
     <div class="steps">
-      <div class="step"><div class="n"></div><div><h3>Prepare the scene</h3><p>Clean the Blender scene, set up the world, lighting, and render settings from the chosen preset.</p></div></div>
-      <div class="step"><div class="n"></div><div><h3>Build the track</h3><p>Instantiate cached healthy and defective section prototypes and chain them into a continuous run of track.</p></div></div>
-      <div class="step"><div class="n"></div><div><h3>Inject defects</h3><p>The defect selector probabilistically starts defects (~10% of sections); multi-section spans queue their own follower positions for continuity.</p></div></div>
-      <div class="step"><div class="n"></div><div><h3>Fly the camera</h3><p>Animate a camera over the track to produce the flyover motion at the configured resolution, duration, and frame rate.</p></div></div>
-      <div class="step"><div class="n"></div><div><h3>Render &amp; assemble</h3><p>Render frames and write the MP4, falling back to a PNG sequence assembled with ffmpeg when the Blender build lacks a video codec.</p></div></div>
+      <div class="step"><div class="n"></div><div><h3>Prepare the Scene:</h3><p>Clean the Blender scene, set up the world, lighting, and render settings from the chosen preset.</p></div></div>
+      <div class="step"><div class="n"></div><div><h3>Build the Track:</h3><p>Instantiate cached healthy and defective section prototypes and chain them into a continuous run of track.</p></div></div>
+      <div class="step"><div class="n"></div><div><h3>Inject Defects:</h3><p>The defect selector probabilistically starts defects (~10% of sections); multi-section spans queue their own follower positions for continuity.</p></div></div>
+      <div class="step"><div class="n"></div><div><h3>Fly the Camera:</h3><p>Animate a camera over the track to produce the flyover motion at the configured resolution, duration, and frame rate.</p></div></div>
+      <div class="step"><div class="n"></div><div><h3>Render &amp; Assemble:</h3><p>Render frames and write the MP4, falling back to a PNG sequence assembled with ffmpeg when the Blender build lacks a video codec.</p></div></div>
     </div>
   </div>
 </section>
@@ -669,19 +835,19 @@
   <div class="wrap">
     <div class="section-head">
       <div class="kicker">The bigger picture</div>
-      <h2>Part of Track Sentry Vision</h2>
+      <h2>Part of Track Sentry Vision:</h2>
       <p>TSV&nbsp;Twin is the rendering half of <strong>Track Sentry Vision (TSV)</strong>, a Walloon&nbsp;Region-funded effort by UCLouvain, UMons and industry partners to build a low-cost, autonomous preventative-maintenance system for railways in developing regions. It was TSV's own detection pipeline that ran into the data bottleneck this project sets out to fix.</p>
     </div>
 
     <div class="grid cols-2">
       <div class="card">
-        <h3>① Parametric track &amp; defects
+        <h3>① Parametric Track &amp; Defects:
           <span class="mono" style="font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--good);border:1px solid rgba(88,201,138,.4);border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:middle;">shipping</span>
         </h3>
         <p>This repository: physically-motivated 3D track geometry, a growing catalogue of geometric defects, and a render pipeline that turns them into video whose ground truth is known by construction.</p>
       </div>
       <div class="card">
-        <h3>② Texture extraction from real imagery
+        <h3>② Texture Extraction from Real Imagery:
           <span class="mono" style="font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-2);border:1px solid rgba(242,165,65,.4);border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:middle;">in&nbsp;progress</span>
         </h3>
         <p>A pipeline that segments real photographs of track components with vision foundation models (e.g. SAM) and derives tileable PBR maps (albedo, roughness, surface normals) so synthetic surfaces match field-deployed infrastructure. Released as a standalone, reusable open-source library.</p>
@@ -695,7 +861,7 @@
   <div class="wrap">
     <div class="section-head">
       <div class="kicker">Get started</div>
-      <h2>Render your first clip</h2>
+      <h2>Render Your First Clip!</h2>
       <p>You'll need <a href="https://www.blender.org/download/" target="_blank" rel="noopener">Blender&nbsp;5.1+</a> and <span class="mono" style="color:var(--amber-2);">ffmpeg</span>. TSV&nbsp;Twin runs <em>inside</em> Blender's Python interpreter, never as standalone <span class="mono">python</span>.</p>
     </div>
 

@@ -1,7 +1,7 @@
 import sys
 from unittest.mock import MagicMock
 import pytest
-from app.geometry.defects.missing_fastener import MissingFastenerPairDefect
+from app.geometry.defects.fasteners import MissingFastenerPairDefect
 
 
 def _section_with_fasteners(n=8):

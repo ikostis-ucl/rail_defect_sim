@@ -1,4 +1,4 @@
-from app.geometry.defects.rail_displacement.base import RailDisplacementDefect
+from app.geometry.defects.rails.rail_displacement.base import RailDisplacementDefect
 
 
 class RightRailLateralDisplacementDefect(RailDisplacementDefect):

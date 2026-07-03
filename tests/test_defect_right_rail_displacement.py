@@ -2,7 +2,7 @@
 import math
 import pytest
 from unittest.mock import MagicMock, patch
-from app.geometry.defects.rail_displacement import RightRailLateralDisplacementDefect
+from app.geometry.defects.rails.rail_displacement import RightRailLateralDisplacementDefect
 from app.config.geometry import TrackGeometryConfig
 
 

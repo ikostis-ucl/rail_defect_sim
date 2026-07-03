@@ -51,7 +51,7 @@ app/
       prototype.py          TrackSectionCache (healthy prototypes)
       defective.py          DefectiveSectionCache (defect variants)
     track_section_cache.py  thin re-export shim → cache/ (back-compat)
-    defects/              Defect system (package): base, variant, per-defect modules, registry, selector
+    defects/              Defect system (package): base, variant, registry, selector, plus per-component subpackages (rails/, fasteners/, sleepers/, ground/, ballast/)
     track_builder.py      Builds the full track by instantiating cached sections
   camera/                 camera setup and animation
   materials/
@@ -69,25 +69,40 @@ assets/
 
 Defects live in the `app/geometry/defects/` package, each as a subclass of `Defect` (`base.py`). Each declares a fixed set of `DefectVariant`s (pure data) and an `apply()` classmethod that mutates a `TrackSection`. Subclasses are collected in `registry.py` (`ALL_DEFECTS`).
 
+Defects are grouped by physical **component** first, then by **family** (mechanism) within a component:
+
+```
+defects/
+  rails/                 11 defects — the only component with more than one family so far
+    rail_displacement/   base.py + defects.py — 8 lateral/inward bends
+    rail_vertical/        base.py + defects.py — 3 vertical bumps
+  fasteners/              1 defect — flat: defect.py directly (single mechanism)
+  sleepers/               1 defect — flat: defect.py directly (single mechanism)
+  ground/                 0 defects — placeholder package, no matching geometry in TrackSection yet
+  ballast/                0 defects — placeholder package, no matching geometry in TrackSection yet
+```
+
+A single-mechanism component skips family-level nesting (`fasteners/defect.py`, not `fasteners/missing_fastener/defect.py`); it only grows a family subpackage once a second, genuinely different mechanism needs one. Each component's `__init__.py` re-exports everything under it, so `registry.py` imports through the component (e.g. `app.geometry.defects.rails`) rather than the family module directly.
+
 Current defect types (the string is the `NAME`, used as the cache key and to force a defect):
 
-| `NAME` | Class | Effect |
-|---|---|---|
-| `skewed_sleeper` | `SkewedSleeperDefect` | sleeper rotated ±2° or ±5° out of perpendicular |
-| `missing_fastener_pair` | `MissingFastenerPairDefect` | one of four fastener pairs removed |
-| `right_rail_lateral_displacement` | `RightRailLateralDisplacementDefect` | right rail bent outward (gauge widens right) |
-| `left_rail_lateral_displacement` | `LeftRailLateralDisplacementDefect` | left rail bent outward (gauge widens left) |
-| `left_rail_inward_displacement` | `LeftRailInwardDisplacementDefect` | left rail bent inward (toward centre) |
-| `right_rail_inward_displacement` | `RightRailInwardDisplacementDefect` | right rail bent inward (toward centre) |
-| `both_rails_gauge_widening` | `BothRailsGaugeWideningDefect` | both rails bend apart (gauge widens) |
-| `both_rails_gauge_narrowing` | `BothRailsGaugeNarrowingDefect` | both rails bend together (gauge narrows) |
-| `both_rails_shift_left` | `BothRailsShiftLeftDefect` | whole track bends left |
-| `both_rails_shift_right` | `BothRailsShiftRightDefect` | whole track bends right |
-| `left_rail_vertical_bump` | `LeftRailVerticalBumpDefect` | left rail bumps upward (lifts off sleeper) |
-| `right_rail_vertical_bump` | `RightRailVerticalBumpDefect` | right rail bumps upward (lifts off sleeper) |
-| `both_rails_vertical_bump` | `BothRailsVerticalBumpDefect` | both rails bump upward together |
+| `NAME` | Class | Component | Effect |
+|---|---|---|---|
+| `skewed_sleeper` | `SkewedSleeperDefect` | sleepers | sleeper rotated ±2° or ±5° out of perpendicular |
+| `missing_fastener_pair` | `MissingFastenerPairDefect` | fasteners | one of four fastener pairs removed |
+| `right_rail_lateral_displacement` | `RightRailLateralDisplacementDefect` | rails | right rail bent outward (gauge widens right) |
+| `left_rail_lateral_displacement` | `LeftRailLateralDisplacementDefect` | rails | left rail bent outward (gauge widens left) |
+| `left_rail_inward_displacement` | `LeftRailInwardDisplacementDefect` | rails | left rail bent inward (toward centre) |
+| `right_rail_inward_displacement` | `RightRailInwardDisplacementDefect` | rails | right rail bent inward (toward centre) |
+| `both_rails_gauge_widening` | `BothRailsGaugeWideningDefect` | rails | both rails bend apart (gauge widens) |
+| `both_rails_gauge_narrowing` | `BothRailsGaugeNarrowingDefect` | rails | both rails bend together (gauge narrows) |
+| `both_rails_shift_left` | `BothRailsShiftLeftDefect` | rails | whole track bends left |
+| `both_rails_shift_right` | `BothRailsShiftRightDefect` | rails | whole track bends right |
+| `left_rail_vertical_bump` | `LeftRailVerticalBumpDefect` | rails | left rail bumps upward (lifts off sleeper) |
+| `right_rail_vertical_bump` | `RightRailVerticalBumpDefect` | rails | right rail bumps upward (lifts off sleeper) |
+| `both_rails_vertical_bump` | `BothRailsVerticalBumpDefect` | rails | both rails bump upward together |
 
-The rail-displacement defects share a `RailDisplacementDefect` base (`rail_displacement/base.py`): the rail mesh is sheared along a half-sine arch over a **span** of consecutive sections (5 or 7) so the bend is continuous; the sleeper is translated rigidly (stays straight) and the outer fastener pair follows. A `(side, sign)` `BENDS` list drives which rail(s) bend and in which direction — one tuple = single rail, two tuples = both rails. Magnitude variants: 3 cm / 6 cm / 10 cm. The shear helper `_bend_mesh(obj, entry, exit, axis)` takes the target axis, so the **vertical bump** defects (`rail_vertical/`) reuse the same machinery, bending in **+Z** instead of X — there the rail lifts off its seat (sleeper stays put) while the fasteners follow upward.
+The rail-displacement defects share a `RailDisplacementDefect` base (`rails/rail_displacement/base.py`): the rail mesh is sheared along a half-sine arch over a **span** of consecutive sections (5 or 7) so the bend is continuous; the sleeper is translated rigidly (stays straight) and the outer fastener pair follows. A `(side, sign)` `BENDS` list drives which rail(s) bend and in which direction — one tuple = single rail, two tuples = both rails. Magnitude variants: 3 cm / 6 cm / 10 cm. The shear helper `_bend_mesh(obj, entry, exit, axis)` takes the target axis, so the **vertical bump** defects (`rails/rail_vertical/`) reuse the same machinery, bending in **+Z** instead of X — there the rail lifts off its seat (sleeper stays put) while the fasteners follow upward.
 
 `DefectSelector.default()` probabilistically injects defects: **10% of sections** *start* a defect (`DEFECT_PROBABILITY`); multi-section spans then queue their follower positions automatically. To add a new defect type, subclass `Defect` (or `RailDisplacementDefect`) and add it to `ALL_DEFECTS` in `registry.py` — the defective cache invalidates automatically (it fingerprints the `defects/` sources; see Section caching).
 

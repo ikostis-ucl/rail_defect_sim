@@ -1,7 +1,7 @@
 import math
 import pytest
 from unittest.mock import MagicMock
-from app.geometry.defects.skewed_sleeper import SkewedSleeperDefect
+from app.geometry.defects.sleepers import SkewedSleeperDefect
 
 
 def test_name():
