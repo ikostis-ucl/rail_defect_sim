@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TSV Twin — Synthetic Railway Video Generator</title>
+<meta name="description" content="TSV Twin is an open digital twin of railway track — a procedural renderer that generates synthetic, ground-truth-labelled video of track defects for training AI defect-detection models. Part of the Track Sentry Vision project. Built on Blender's Python API." />
+<meta property="og:title" content="TSV Twin — Synthetic Railway Video Generator" />
+<meta property="og:description" content="An open digital twin of railway track: procedurally generated, ground-truth-labelled video of geometric defects for AI training. Built on Blender." />
+<meta property="og:type" content="website" />
+<style>
+  :root {
+    --bg:        #0b0f14;
+    --bg-2:      #10161f;
+    --panel:     #141c27;
+    --panel-2:   #18212e;
+    --line:      #243141;
+    --ink:       #e7edf4;
+    --ink-soft:  #9fb0c3;
+    --ink-dim:   #6b7c90;
+    --steel:     #7fa7d0;
+    --amber:     #f2a541;
+    --amber-2:   #ffca6a;
+    --rail:      #b9c6d4;
+    --good:      #58c98a;
+    --bad:       #e2574c;
+    --radius:    14px;
+    --maxw:      1120px;
+    --ease:      cubic-bezier(.2,.7,.2,1);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: var(--amber-2); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1, h2, h3 { line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 .5em; }
+  h2 { font-size: clamp(1.5rem, 3.2vw, 2.2rem); }
+  p { margin: 0 0 1em; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+
+  /* ---------- Top nav ---------- */
+  header.nav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(10px);
+    background: rgba(11,15,20,.72);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-inner { display: flex; align-items: center; gap: 20px; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
+  .brand:hover { text-decoration: none; }
+  .brand .logo { width: 26px; height: 26px; }
+  .nav-links { margin-left: auto; display: flex; gap: 22px; align-items: center; }
+  .nav-links a { color: var(--ink-soft); font-size: .93rem; }
+  .nav-links a:hover { color: var(--ink); text-decoration: none; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: .93rem;
+    border: 1px solid var(--line); color: var(--ink); background: var(--panel);
+    transition: transform .15s var(--ease), border-color .15s var(--ease), background .15s var(--ease);
+    cursor: pointer;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); border-color: var(--steel); }
+  .btn.primary { background: linear-gradient(180deg, var(--amber-2), var(--amber)); color: #201603; border-color: transparent; }
+  .btn.primary:hover { filter: brightness(1.05); }
+  @media (max-width: 720px) { .nav-links a.hide-sm { display: none; } }
+
+  /* ---------- Hero ---------- */
+  .hero { position: relative; padding: 96px 0 80px; overflow: hidden; }
+  .hero-bg {
+    position: absolute; inset: 0; z-index: 0;
+    background:
+      radial-gradient(900px 500px at 80% -10%, rgba(242,165,65,.14), transparent 60%),
+      radial-gradient(700px 500px at 10% 10%, rgba(127,167,208,.12), transparent 55%),
+      linear-gradient(180deg, var(--bg-2), var(--bg));
+  }
+  .hero-inner { position: relative; z-index: 2; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: .8rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--amber-2); background: rgba(242,165,65,.1);
+    border: 1px solid rgba(242,165,65,.28); padding: 6px 12px; border-radius: 999px;
+    margin-bottom: 22px;
+  }
+  .hero h1 { font-size: clamp(2.2rem, 6vw, 4rem); max-width: 16ch; }
+  .hero .lede { font-size: clamp(1.05rem, 2.2vw, 1.35rem); color: var(--ink-soft); max-width: 60ch; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 30px; }
+
+  /* Animated top-down rail scene in the hero — echoes the actual render */
+  .rail-scene {
+    position: relative; z-index: 1;
+    margin-top: 56px; height: 320px; border-radius: var(--radius);
+    border: 1px solid var(--line);
+    overflow: hidden;
+    background: linear-gradient(180deg, #7a866c, #6a7660);
+    box-shadow: inset 0 0 110px rgba(0,0,0,.5), 0 30px 80px -40px rgba(0,0,0,.9);
+  }
+  .td-track { position: absolute; inset: 0; }
+  /* scrolling column of sleepers */
+  .td-strip {
+    position: absolute; left: 0; right: 0; top: 0;
+    display: flex; flex-direction: column;
+    animation: scroll-y 3.8s linear infinite;
+  }
+  .td-group { display: flex; flex-direction: column; gap: 44px; padding-top: 44px; }
+  .td-sleeper {
+    position: relative; height: 26px; margin: 0 14%;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #cdae86, #b28f58);
+    box-shadow: 0 4px 0 #7c6540, 0 6px 10px rgba(0,0,0,.35);
+  }
+  /* fastener dots where the rails cross the sleeper */
+  .td-sleeper::before, .td-sleeper::after {
+    content: ""; position: absolute; top: 50%; transform: translateY(-50%);
+    width: 5px; height: 5px; border-radius: 50%; background: #2c2a22;
+  }
+  .td-sleeper::before { left: 17%; }
+  .td-sleeper::after  { right: 17%; }
+  .td-sleeper.defect { transform: rotate(-7deg); }
+  .defect-tag {
+    position: absolute; top: -3px; left: -98px; width: 86px; text-align: right;
+    font: 700 9px/1.2 ui-monospace, monospace; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--amber-2); opacity: .92;
+  }
+  .defect-tag::after {
+    content: ""; position: absolute; right: -14px; top: 4px;
+    width: 11px; height: 1px; background: var(--amber);
+  }
+  /* rails ride on top of the sleepers */
+  .td-rail {
+    position: absolute; top: -2%; bottom: -2%; width: 22px; z-index: 4;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #b7bfc2, #eef1f2 45%, #aeb7bb);
+    box-shadow: 0 0 0 1px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.3);
+  }
+  .td-rail.left  { left: 25%; }
+  .td-rail.right { right: 25%; }
+  @keyframes scroll-y { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+  @media (prefers-reduced-motion: reduce) {
+    .td-strip { animation: none; }
+  }
+
+  /* ---------- Sections ---------- */
+  section { padding: 78px 0; border-top: 1px solid var(--line); }
+  .section-head { max-width: 62ch; margin-bottom: 40px; }
+  .section-head .kicker { color: var(--steel); font-size: .82rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; }
+  .section-head p { color: var(--ink-soft); font-size: 1.08rem; }
+
+  /* Feature grid */
+  .grid { display: grid; gap: 20px; }
+  .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 900px) { .grid.cols-3 { grid-template-columns: 1fr; } .grid.cols-2 { grid-template-columns: 1fr; } }
+  .card {
+    background: linear-gradient(180deg, var(--panel), var(--panel-2));
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 26px; transition: transform .18s var(--ease), border-color .18s var(--ease);
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--steel); }
+  .card .ico { width: 34px; height: 34px; margin-bottom: 14px; color: var(--amber); }
+  .card h3 { font-size: 1.12rem; }
+  .card p { color: var(--ink-soft); margin: 0; font-size: .96rem; }
+
+  /* Output gallery — one card per camera rig */
+  .gallery { display: grid; gap: 18px; grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 820px) { .gallery { grid-template-columns: 1fr; } }
+  .shot {
+    position: relative; border-radius: var(--radius); overflow: hidden;
+    border: 1px solid var(--line); background: #000;
+    transition: transform .18s var(--ease), border-color .18s var(--ease);
+  }
+  .shot:hover { transform: translateY(-3px); border-color: var(--steel); }
+  .shot video {
+    display: block; width: 100%; aspect-ratio: 16 / 9;
+    object-fit: cover; background: #6a7660;
+  }
+  .shot .label {
+    position: absolute; left: 12px; bottom: 12px; z-index: 2;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(11,15,20,.72); backdrop-filter: blur(6px);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+    font-size: .85rem; font-weight: 600; color: var(--ink);
+  }
+  .shot .label .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 8px rgba(242,165,65,.6); }
+  .shot .label.defect {
+    left: auto; right: 12px; bottom: auto; top: 12px;
+    background: rgba(242,165,65,.16); border-color: rgba(242,165,65,.5); color: var(--amber-2);
+    text-transform: uppercase; letter-spacing: .06em; font-size: .72rem;
+  }
+
+  /* Defect catalogue */
+  .defects { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .defect {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    font-size: .93rem; transition: border-color .15s var(--ease), background .15s var(--ease);
+  }
+  .defect:hover { border-color: var(--amber); background: var(--panel-2); }
+  .defect .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--amber); flex: 0 0 auto; box-shadow: 0 0 10px rgba(242,165,65,.6); }
+  .defect code { color: var(--ink-dim); font-size: .78rem; display: block; }
+
+  /* Pipeline steps */
+  .steps { counter-reset: step; display: grid; gap: 16px; }
+  .step { display: grid; grid-template-columns: 48px 1fr; gap: 18px; align-items: start;
+    padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .step .n { counter-increment: step; width: 44px; height: 44px; border-radius: 12px;
+    display: grid; place-items: center; font-weight: 800; color: #201603;
+    background: linear-gradient(180deg, var(--amber-2), var(--amber)); }
+  .step .n::before { content: counter(step); }
+  .step h3 { margin-bottom: 4px; font-size: 1.05rem; }
+  .step p { margin: 0; color: var(--ink-soft); font-size: .95rem; }
+
+  /* Code block */
+  .code {
+    background: #0a0e13; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 22px 24px; overflow-x: auto; font-size: .9rem; color: #cfe0f2;
+  }
+  .code pre { margin: 0; }
+  .code .c { color: var(--ink-dim); }
+  .code .k { color: var(--amber-2); }
+  .code .s { color: var(--good); }
+
+  /* Callout */
+  .callout { display: flex; gap: 14px; align-items: flex-start;
+    background: rgba(127,167,208,.08); border: 1px solid rgba(127,167,208,.28);
+    border-radius: 12px; padding: 16px 18px; color: var(--ink-soft); font-size: .93rem; margin-top: 22px; }
+  .callout b { color: var(--ink); }
+
+  /* Footer */
+  footer { border-top: 1px solid var(--line); background: var(--bg-2); padding: 48px 0; }
+  .foot-grid { display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between; align-items: center; }
+  .foot-links { display: flex; gap: 22px; flex-wrap: wrap; }
+  .foot-links a { color: var(--ink-soft); font-size: .92rem; }
+  .muted { color: var(--ink-dim); font-size: .86rem; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="4" y="2" width="3" height="20" rx="1.2" fill="#b9c6d4"/>
+        <rect x="17" y="2" width="3" height="20" rx="1.2" fill="#b9c6d4"/>
+        <rect x="2" y="6" width="20" height="2.4" rx="1" fill="#f2a541"/>
+        <rect x="2" y="15.6" width="20" height="2.4" rx="1" fill="#f2a541"/>
+      </svg>
+      TSV&nbsp;Twin
+    </a>
+    <nav class="nav-links">
+      <a href="#why" class="hide-sm">Why</a>
+      <a href="#about" class="hide-sm">Approach</a>
+      <a href="#defects" class="hide-sm">Defects</a>
+      <a href="#data" class="hide-sm">Data</a>
+      <a href="#start">Get started</a>
+      <a class="btn" href="https://github.com/ikostis-ucl/rail_defect_sim" target="_blank" rel="noopener">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<a id="top"></a>
+
+<!-- HERO -->
+<section class="hero" style="border-top:none;">
+  <div class="hero-bg" aria-hidden="true"></div>
+  <div class="wrap hero-inner">
+    <span class="eyebrow">● Open digital twin · Blender · Railway defect detection</span>
+    <h1>Procedural railway video, engineered for defect-detection AI.</h1>
+    <p class="lede">
+      TSV&nbsp;Twin is an <strong>open digital twin of railway track</strong>. It builds the track section by
+      section — grounded in real rail-profile standards — and flies a camera over it to render synthetic video
+      with a controllable catalogue of geometric defects. Because the scene is generated, ground truth is known
+      by construction: perfectly labelled training data for the failure modes real datasets never capture,
+      without a single field recording.
+    </p>
+    <div class="cta-row">
+      <a class="btn primary" href="#start">Get started</a>
+      <a class="btn" href="https://github.com/ikostis-ucl/rail_defect_sim" target="_blank" rel="noopener">View on GitHub ↗</a>
+    </div>
+
+    <!-- Animated top-down rail scene (CSS) — mirrors the pipeline's bird's-eye render -->
+    <div class="rail-scene" aria-label="Top-down animation of a camera flying over railway track, with a skewed-sleeper defect passing through">
+      <div class="td-track" aria-hidden="true">
+        <div class="td-strip">
+          <div class="td-group">
+            <div class="td-sleeper"></div>
+            <div class="td-sleeper"></div>
+            <div class="td-sleeper defect"><span class="defect-tag">skewed sleeper</span></div>
+            <div class="td-sleeper"></div>
+            <div class="td-sleeper"></div>
+            <div class="td-sleeper"></div>
+          </div>
+          <div class="td-group">
+            <div class="td-sleeper"></div>
+            <div class="td-sleeper"></div>
+            <div class="td-sleeper defect"><span class="defect-tag">skewed sleeper</span></div>
+            <div class="td-sleeper"></div>
+            <div class="td-sleeper"></div>
+            <div class="td-sleeper"></div>
+          </div>
+        </div>
+        <div class="td-rail left"></div>
+        <div class="td-rail right"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section id="why">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">The problem</div>
+      <h2>Real inspection footage is scarce, skewed, and locked away</h2>
+      <p>
+        Automated railway defect detection lives or dies by its training data — and that data barely exists.
+        Public imagery is heavily skewed toward rail-surface faults like squats, shellings and cracks, because
+        they are visible and common. The failure modes that matter most — track-geometry deviations such as
+        lateral displacement and differential settlement — are underrepresented, and to our knowledge uncovered
+        by any public dataset.
+      </p>
+      <p>
+        The reasons compound. In well-maintained networks, monitoring systems — vibration analysis,
+        eddy-current and ultrasonic testing — catch defects long before they are visible to a camera, so there
+        is little to photograph. Operators guard their inspection data as operationally sensitive. And the
+        simulation tools that could close the gap are proprietary and closed.
+      </p>
+    </div>
+    <div class="callout">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--steel)" stroke-width="1.8" style="flex:0 0 auto;margin-top:2px"><path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3-5.5-3-5.5 3 1-6.3L3 8.9 9 8z"/></svg>
+      <div><b>TSV&nbsp;Twin's answer:</b> generate the footage instead. Build the track procedurally, deform it in
+      physically-motivated ways, and render it — so the rare, safety-critical cases become available on demand,
+      perfectly labelled.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section id="about">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">The approach</div>
+      <h2>An open digital twin, generated from open data</h2>
+      <p>
+        TSV&nbsp;Twin builds railway track procedurally in Blender and deforms it in physically-motivated ways,
+        so the position, type and severity of every defect is chosen by the pipeline and therefore known
+        exactly. The result is a scalable, transparent source of the balanced, fully-labelled data that
+        safety-critical detection systems need — and that the real world refuses to hand over.
+      </p>
+    </div>
+
+    <div class="grid cols-3">
+      <div class="card">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/></svg>
+        <h3>Parametric track geometry</h3>
+        <p>Track is assembled from cached H-shaped sections — rails, sleepers, fasteners and clips — validated against real rail-profile standards (UIC54, UIC60, AREMA 115RE). Change the config, get a different, dimensionally-faithful stretch of track.</p>
+      </div>
+      <div class="card">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <h3>Geometry defects on demand</h3>
+        <p>A registry of 13 physically-motivated deformations — gauge widening and narrowing, lateral and inward shift, vertical bumps, missing fasteners — the operationally serious, data-starved category. Injected probabilistically or forced.</p>
+      </div>
+      <div class="card">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M8 5v14"/></svg>
+        <h3>Ground truth for free</h3>
+        <p>Because the scene is generated, every defect's location and class is known by construction — no manual labelling, no ambiguity, and rare cases on tap.</p>
+      </div>
+      <div class="card">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 17V7a2 2 0 012-2h9l5 5v7a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M15 5v4h4"/></svg>
+        <h3>Repeatable presets</h3>
+        <p>From 640×360 drafts to 4K production runs — one command each. Deterministic output makes a growing, balanced dataset easy to assemble over time.</p>
+      </div>
+      <div class="card">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M5 8l7-5 7 5"/><circle cx="12" cy="14" r="3"/></svg>
+        <h3>Physically-based materials</h3>
+        <p>Rails, sleepers, ballast and fasteners carry procedural PBR shading — metallic response, roughness, surface detail — so light behaves as it does on oxidised steel and weathered concrete, not a flat photo.</p>
+      </div>
+      <div class="card">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+        <h3>Cached &amp; headless</h3>
+        <p>Section prototypes are built once and reused, with automatic source-fingerprint versioning — edit the geometry and stale assets rebuild themselves. Runs headless in Blender's <span class="mono">bpy</span>, with an ffmpeg fallback to MP4.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OUTPUT SHOWCASE -->
+<section id="output">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">Output</div>
+      <h2>See it in motion</h2>
+      <p>The same procedurally generated track, filmed from four camera rigs the pipeline ships with. These are short draft renders — placeholders until higher-resolution sequences land — but the geometry, materials and defects are the real output.</p>
+    </div>
+
+    <div class="gallery">
+      <div class="shot">
+        <video autoplay muted loop playsinline preload="metadata">
+          <source src="media/demo_birds_eye.mp4" type="video/mp4" />
+        </video>
+        <span class="label"><span class="dot"></span>Bird's-eye</span>
+      </div>
+      <div class="shot">
+        <video autoplay muted loop playsinline preload="metadata">
+          <source src="media/demo_drone_three_quarter.mp4" type="video/mp4" />
+        </video>
+        <span class="label"><span class="dot"></span>Drone ¾</span>
+        <span class="label defect">gauge widening</span>
+      </div>
+      <div class="shot">
+        <video autoplay muted loop playsinline preload="metadata">
+          <source src="media/demo_low_inspection.mp4" type="video/mp4" />
+        </video>
+        <span class="label"><span class="dot"></span>Low inspection</span>
+      </div>
+      <div class="shot">
+        <video autoplay muted loop playsinline preload="metadata">
+          <source src="media/demo_windshield.mp4" type="video/mp4" />
+        </video>
+        <span class="label"><span class="dot"></span>Windshield</span>
+      </div>
+    </div>
+
+    <div class="callout">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--steel)" stroke-width="1.8" style="flex:0 0 auto;margin-top:2px"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+      <div><b>Swapping in your own:</b> render a clip, transcode it for the web
+      (<span class="mono">ffmpeg -i in.mp4 -vf scale=1280:-2 -movflags +faststart out.mp4</span>),
+      and drop it into <span class="mono">docs/media/</span> in place of a demo file. GIFs and stills work too.</div>
+    </div>
+  </div>
+</section>
+
+<!-- DEFECTS -->
+<section id="defects">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">Defect catalogue</div>
+      <h2>Thirteen defect types, all ground-truth labelled</h2>
+      <p>Track-geometry deviations are the category public datasets miss — and the one this project targets first. Each defect is a physically-motivated deformation: rail-displacement types bend the rail along a smooth half-sine arch across several sections, so the bend is continuous and realistic rather than a single kinked vertex.</p>
+    </div>
+
+    <div class="defects">
+      <div class="defect"><span class="dot"></span><div>Skewed sleeper <code>skewed_sleeper</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Missing fastener pair <code>missing_fastener_pair</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Right rail lateral displacement <code>right_rail_lateral_displacement</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Left rail lateral displacement <code>left_rail_lateral_displacement</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Left rail inward displacement <code>left_rail_inward_displacement</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Right rail inward displacement <code>right_rail_inward_displacement</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Both rails gauge widening <code>both_rails_gauge_widening</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Both rails gauge narrowing <code>both_rails_gauge_narrowing</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Both rails shift left <code>both_rails_shift_left</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Both rails shift right <code>both_rails_shift_right</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Left rail vertical bump <code>left_rail_vertical_bump</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Right rail vertical bump <code>right_rail_vertical_bump</code></div></div>
+      <div class="defect"><span class="dot"></span><div>Both rails vertical bump <code>both_rails_vertical_bump</code></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- DATA -->
+<section id="data">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">Grounded</div>
+      <h2>Built on open standards and open data</h2>
+      <p>None of this is invented from thin air. The geometry follows published rail standards, and the realism draws on open-access railway datasets — the same sources that let synthetic footage stand in for the real thing.</p>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>UIC54 · UIC60 · AREMA 115RE</h3>
+        <p>Rail cross-sections and sleeper dimensions are validated against real profile standards (UIC leaflet 860; AREMA Manual for Railway Engineering, Ch. 4). Feed in a geometry config and any out-of-spec dimension is flagged and corrected.</p>
+      </div>
+      <div class="card">
+        <h3>RailSem19</h3>
+        <p>8,500 annotated sequences shot from the cab of trains and trams across 38 countries, four seasons and varied weather — the reference for intact-component textures and background terrain under real lighting.</p>
+      </div>
+      <div class="card">
+        <h3>Rail-surface defect sets</h3>
+        <p>~6,800 high-resolution images across surface-fault classes — cracks, shellings, squats, spallings, seams and more — supplying material-level defect signatures for weathering and wear.</p>
+      </div>
+      <div class="card">
+        <h3>Railway Track Surface Faults (MUET)</h3>
+        <p>5,200+ close-range railhead images at 120&nbsp;fps across seven fault classes, captured with a focused 14-inch field of view — fine-grained ground truth for material degradation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PIPELINE -->
+<section id="pipeline">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">How it works</div>
+      <h2>One pass, from empty scene to annotated MP4</h2>
+      <p>The whole run is a single execution path orchestrated by the render pipeline.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step"><div class="n"></div><div><h3>Prepare the scene</h3><p>Clean the Blender scene, set up the world, lighting, and render settings from the chosen preset.</p></div></div>
+      <div class="step"><div class="n"></div><div><h3>Build the track</h3><p>Instantiate cached healthy and defective section prototypes and chain them into a continuous run of track.</p></div></div>
+      <div class="step"><div class="n"></div><div><h3>Inject defects</h3><p>The defect selector probabilistically starts defects (~10% of sections); multi-section spans queue their own follower positions for continuity.</p></div></div>
+      <div class="step"><div class="n"></div><div><h3>Fly the camera</h3><p>Animate a camera over the track to produce the flyover motion at the configured resolution, duration, and frame rate.</p></div></div>
+      <div class="step"><div class="n"></div><div><h3>Render &amp; assemble</h3><p>Render frames and write the MP4 — falling back to a PNG sequence assembled with ffmpeg when the Blender build lacks a video codec.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTEXT -->
+<section id="context">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">The bigger picture</div>
+      <h2>Part of Track Sentry Vision</h2>
+      <p>TSV&nbsp;Twin is the rendering half of <strong>Track Sentry Vision (TSV)</strong> — a Walloon&nbsp;Region-funded effort by UCLouvain, UMons and industry partners to build a low-cost, autonomous preventative-maintenance system for railways in developing regions. It was TSV's own detection pipeline that ran into the data bottleneck this project sets out to fix.</p>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="card">
+        <h3>① Parametric track &amp; defects
+          <span class="mono" style="font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--good);border:1px solid rgba(88,201,138,.4);border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:middle;">shipping</span>
+        </h3>
+        <p>This repository: physically-motivated 3D track geometry, a growing catalogue of geometric defects, and a render pipeline that turns them into video whose ground truth is known by construction.</p>
+      </div>
+      <div class="card">
+        <h3>② Texture extraction from real imagery
+          <span class="mono" style="font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-2);border:1px solid rgba(242,165,65,.4);border-radius:999px;padding:2px 9px;margin-left:8px;vertical-align:middle;">in&nbsp;progress</span>
+        </h3>
+        <p>A pipeline that segments real photographs of track components with vision foundation models (e.g. SAM) and derives tileable PBR maps — albedo, roughness, surface normals — so synthetic surfaces match field-deployed infrastructure. Released as a standalone, reusable open-source library.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GET STARTED -->
+<section id="start">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">Get started</div>
+      <h2>Render your first clip</h2>
+      <p>You'll need <a href="https://www.blender.org/download/" target="_blank" rel="noopener">Blender&nbsp;5.1+</a> and <span class="mono">ffmpeg</span>. TSV&nbsp;Twin runs <em>inside</em> Blender's Python interpreter — never as standalone <span class="mono">python</span>.</p>
+    </div>
+
+    <div class="grid cols-2">
+      <div class="code">
+<pre><span class="c"># 1. Clone and install dependencies (uv)</span>
+git clone https://github.com/ikostis-ucl/rail_defect_sim.git
+<span class="k">cd</span> rail_defect_sim
+uv sync
+
+<span class="c"># 2. Render a quick draft (640×360, ~2s)</span>
+./runtime/draft_quick.sh
+
+<span class="c"># 3. Or a full preview / production run</span>
+./runtime/draft_preview.sh
+./runtime/final_fullhd.sh</pre>
+      </div>
+      <div class="code">
+<pre><span class="c"># The canonical invocation, spelled out:</span>
+blender --background --python run_video_gen.py
+
+<span class="c"># Pass overrides after `--`</span>
+blender --background --python run_video_gen.py -- \
+    --duration-seconds <span class="s">10</span> \
+    --resolution-x <span class="s">1920</span> --resolution-y <span class="s">1080</span>
+
+<span class="c"># Output lands in data/output/&lt;run_name&gt;/</span></pre>
+      </div>
+    </div>
+
+    <div class="callout">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--steel)" stroke-width="1.8" style="flex:0 0 auto;margin-top:2px"><path d="M12 2l9 5v10l-9 5-9-5V7z"/></svg>
+      <div>Full installation and configuration notes — including portable, root-free installs of Blender and ffmpeg — live in the
+      <a href="https://github.com/ikostis-ucl/rail_defect_sim#readme" target="_blank" rel="noopener">project README</a>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap foot-grid">
+    <div>
+      <div class="brand" style="margin-bottom:8px;">
+        <svg class="logo" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="4" y="2" width="3" height="20" rx="1.2" fill="#b9c6d4"/>
+          <rect x="17" y="2" width="3" height="20" rx="1.2" fill="#b9c6d4"/>
+          <rect x="2" y="6" width="20" height="2.4" rx="1" fill="#f2a541"/>
+          <rect x="2" y="15.6" width="20" height="2.4" rx="1" fill="#f2a541"/>
+        </svg>
+        TSV&nbsp;Twin
+      </div>
+      <p class="muted" style="max-width:42ch;margin:0;">Synthetic, annotated railway video for AI defect-detection research.</p>
+    </div>
+    <div class="foot-links">
+      <a href="https://github.com/ikostis-ucl/rail_defect_sim" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/ikostis-ucl/rail_defect_sim#readme" target="_blank" rel="noopener">Documentation</a>
+      <a href="https://github.com/ikostis-ucl/rail_defect_sim/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+    </div>
+  </div>
+  <div class="wrap" style="margin-top:28px;">
+    <p class="muted" style="margin:0 0 10px;max-width:82ch;">Developed within the Track&nbsp;Sentry&nbsp;Vision project (UCLouvain · UMons), funded by the Walloon Region. Foundational work: A.&nbsp;Crespin, I.&nbsp;A.&nbsp;Kostis &amp; P.&nbsp;Schaus, <em>Railway Track Defect Detection</em>, BNAIC/Benelearn&nbsp;2025.</p>
+    <p class="muted" style="margin:0;">© 2026 Université&nbsp;catholique&nbsp;de&nbsp;Louvain (UCLouvain). Released under the MIT License.</p>
+  </div>
+</footer>
+
+</body>
+</html>

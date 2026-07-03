@@ -11,7 +11,7 @@ exec "$BLENDER_BIN" \
   --python "$PROJECT_ROOT/run_video_gen.py" \
   -- \
   --config "$PROJECT_ROOT/configs/camera/birds_eye.yml" \
-  --fps 10 \
+  --fps 24 \
   --duration-seconds 10 \
   --resolution-x 960 \
   --resolution-y 540 \
