@@ -48,11 +48,53 @@ Output lands in `data/output/<run_name>/`.
 
 ## Architecture
 
+### The core split: config (data) vs builder (bpy)
+
+Every domain is modelled twice — as a **frozen, `bpy`-free config dataclass**
+describing *what* to build, and a **builder** that turns it into Blender objects:
+
+| Domain | Config (no `bpy`) | Builder (`bpy`) |
+|---|---|---|
+| Track geometry | `TrackGeometryConfig` | `TrackSection` / `TrackBuilder` |
+| Camera | `CameraConfig` | `CameraAnimator` |
+| Environment | `EnvironmentConfig` (world, sun, ground) | `SceneSetup` / `TrackBuilder` |
+| Surfaces | `AppearanceConfig` | `MaterialFactory` |
+| Render | `RenderConfig` | `RenderSetup` |
+
+`PipelineSettings` is the **composition root**: it owns one config per domain plus
+run-level values (`track_length`, `seed`, `output_filename`, …).
+
+**This split is load-bearing, not stylistic.** Constraint validation runs *before*
+Blender launches, so anything it reads must import without `bpy`. Two rules keep
+that true, both enforced by `tests/test_bpy_free_imports.py` (which blocks `bpy`
+outright in a subprocess — the `conftest.py` stub would mask the coupling):
+
+- **`app/config/` must never import `bpy`.**
+- **Defect *metadata* must never import `bpy`.** `app/geometry/__init__.py` exports
+  its builders lazily (PEP 562) and the defect modules import `TrackSection` only
+  under `TYPE_CHECKING`, so `ALL_DEFECTS` is readable outside Blender. Only
+  `Defect.apply()` needs Blender, and `fasteners` imports `bpy` inside the method.
+
+### Expansibility rule
+
+Write constraints and annotation logic against **derived quantities, never config
+identities**. One `TrackInFrame` check reads `CameraConfig` and covers every camera
+preset; one observability check reads `Defect.span_sections()` / `displacement_m()`
+and covers every defect. `Defect` exposes that metadata uniformly on the base class,
+so a 14th defect type needs no change to any consumer.
+
 ```
 run_video_gen.py          entrypoint (Blender calls this)
-config.py                 CLI arg parsing → PipelineSettings
+config.py                 flat CLI args → nested per-domain configs
 app/
-  config/settings.py      PipelineSettings frozen dataclass
+  config/                 pure data, no bpy:
+    settings.py             PipelineSettings — composition root
+    render.py               RenderConfig (resolution, fps, duration, engine)
+    camera.py               CameraConfig (pose, lens, sensor, height datum)
+    environment.py          EnvironmentConfig (WorldConfig, SunConfig, GroundConfig)
+    appearance.py           AppearanceConfig (per-surface colour/metallic/roughness)
+    geometry.py             TrackGeometryConfig (+ RailConfig, derived quantities)
+    profiles.py             RailProfileSpec catalog (YAML-overridable)
   core/pipeline.py        RailwayVideoPipeline — orchestrates everything
   geometry/
     track_section.py      TrackSection: builds one H-shaped section (rails + sleepers + fasteners)
@@ -63,17 +105,15 @@ app/
       manifest.py           CacheManifest — cache_index.json inventory
       prototype.py          TrackSectionCache (healthy prototypes)
       defective.py          DefectiveSectionCache (defect variants)
-    track_section_cache.py  thin re-export shim → cache/ (back-compat)
-    defects/              Defect system (package): base, variant, registry, selector, plus per-component subpackages (rails/, fasteners/, sleepers/, ground/, ballast/)
+    defects/              Defect system (package, bpy-free metadata): base, variant, registry, selector, plus per-component subpackages (rails/, fasteners/, sleepers/, ground/, ballast/)
     track_builder.py      Builds the full track by instantiating cached sections
-  camera/                 camera setup and animation
-  materials/              one module per material:
-    base.py                 Material abstract base
-    rail.py / sleeper.py / fastener.py / clip.py / grass.py   concrete types
-    factory.py              MaterialFactory coordinator
-    material_factory.py     thin re-export shim → the modules above (back-compat)
+  camera/                 CameraAnimator — builds/animates the camera from CameraConfig
+  materials/              builders for surfaces:
+    base.py                 Material ABC + PrincipledMaterial + NoiseBlendMaterial
+    rail.py / sleeper.py / fastener.py / clip.py / grass.py   named types (NAME only)
+    factory.py              MaterialFactory — pairs each type with its appearance
   render/                 render settings + PNG→MP4 fallback via ffmpeg
-  scene/                  scene/world/lighting setup
+  scene/                  SceneSetup — world, units, lighting from EnvironmentConfig
 configs/
   camera/                 camera pose presets (birds_eye, windshield, roof_far,
                           low_inspection, drone_three_quarter) — pass with --config
@@ -198,7 +238,7 @@ If the Blender build lacks a video codec, the render falls back to a PNG frame s
 ## Tests
 
 ```bash
-pytest              # 267 tests, ~0.3 s
+pytest              # 361 tests, ~0.5 s
 ```
 
 Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub

@@ -1,8 +1,7 @@
 import bpy
 
-from app.config import PipelineSettings
-from app.config.geometry import TrackGeometryConfig
-from app.geometry.cache import TrackSectionCache, DefectiveSectionCache
+from app.config import EnvironmentConfig, PipelineSettings, TrackGeometryConfig
+from app.geometry.cache import DefectiveSectionCache, TrackSectionCache
 from app.geometry.defects import DefectSelector
 from app.geometry.track_section import TrackSection
 from app.geometry.utils import move_to_collection
@@ -19,29 +18,31 @@ class TrackBuilder:
         self.section_cache = TrackSectionCache()
         self.defective_cache = DefectiveSectionCache()
 
-    def build(self) -> None:
+    def build(self, geometry: TrackGeometryConfig) -> None:
+        """Build the full track from *geometry*.
+
+        The geometry config is passed in rather than loaded here so that the
+        pipeline resolves it once and every consumer — track, camera datum,
+        validation — sees the same values.
+        """
         print("Modeling geometry (modular approach)...")
 
-        rail_mat     = self.materials.create_rail_material()
-        sleeper_mat  = self.materials.create_sleeper_material()
+        rail_mat = self.materials.create_rail_material()
+        sleeper_mat = self.materials.create_sleeper_material()
         fastener_mat = self.materials.create_fastener_material()
-        grass_mat    = self.materials.create_grass_material()
-
-        geometry_cfg = self._load_geometry_config()
+        grass_mat = self.materials.create_grass_material()
 
         track_length = self.settings.track_length
-        section_spacing = geometry_cfg.section_pitch
-        section_z = 0.1
+        section_spacing = geometry.section_pitch
+        section_z = geometry.base_elevation
 
-        bpy.ops.mesh.primitive_plane_add(size=1, location=(0, track_length / 2, -0.3))
-        grass = bpy.context.active_object
-        grass.name = "GrassGround"
-        grass.scale = (100, track_length, 1)
-        grass.data.materials.append(grass_mat)
+        self._build_ground(
+            self.settings.environment.ground, track_length, section_z, grass_mat
+        )
 
         num_sections = int(track_length / section_spacing) + 1
 
-        prototype = TrackSection(config=geometry_cfg)
+        prototype = TrackSection(config=geometry)
         prototype_collection = self.section_cache.get_or_create_prototype_collection(prototype)
         TrackSection.apply_materials_to_collection(
             prototype_collection,
@@ -58,8 +59,8 @@ class TrackBuilder:
         track_parent.name = "ModularTrack"
         move_to_collection(track_parent, track_sections_collection)
 
-        force_defect = getattr(self.settings, "force_defect", None)
-        seed = getattr(self.settings, "seed", None)
+        force_defect = self.settings.force_defect
+        seed = self.settings.seed
         print(f"Defect placement seed: {seed}")
         defect_selector = (
             DefectSelector.forced(force_defect, seed=seed)
@@ -69,7 +70,7 @@ class TrackBuilder:
         defective_collections = {}
         for variant in defect_selector.all_variants():
             defective_col = self.defective_cache.get_or_create_defective_collection(
-                TrackSection(config=geometry_cfg),
+                TrackSection(config=geometry),
                 variant,
             )
             TrackSection.apply_materials_to_collection(
@@ -119,8 +120,11 @@ class TrackBuilder:
             f"({100 * defect_count / max(num_sections, 1):.1f} %)."
         )
 
-    def _load_geometry_config(self) -> TrackGeometryConfig:
-        config_path = getattr(self.settings, "geometry_config_path", None)
-        if config_path:
-            return TrackGeometryConfig.from_yaml(config_path)
-        return TrackGeometryConfig()
+    def _build_ground(self, ground_cfg, track_length, section_z, grass_mat) -> None:
+        bpy.ops.mesh.primitive_plane_add(
+            size=1, location=(0, track_length / 2, section_z + ground_cfg.z_offset)
+        )
+        grass = bpy.context.active_object
+        grass.name = "GrassGround"
+        grass.scale = (ground_cfg.half_width, track_length, 1)
+        grass.data.materials.append(grass_mat)

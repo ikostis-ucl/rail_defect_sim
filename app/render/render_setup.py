@@ -1,3 +1,9 @@
+"""Render builder — applies a RenderConfig to the Blender scene.
+
+The *builder* half of rendering. The *data* half is
+``app.config.render.RenderConfig``.
+"""
+
 from pathlib import Path
 
 import bpy
@@ -14,23 +20,29 @@ class RenderSetup:
         self.requested_video_path: Path | None = None
         self.png_sequence_prefix: Path | None = None
 
+    @property
+    def config(self):
+        return self.settings.render
+
     def apply(self) -> None:
         scene = bpy.context.scene
-        total_frames = self.settings.total_frames
-        fps = self.settings.fps
+        cfg = self.config
 
         print(
-            f"Setting up render settings: {total_frames} frames at {fps} fps "
-            f"({total_frames / fps} seconds)..."
+            f"Setting up render settings: {cfg.total_frames} frames at {cfg.fps} fps "
+            f"({cfg.total_frames / cfg.fps} seconds)..."
         )
 
-        scene.render.engine = self.settings.render_engine
-        scene.render.resolution_x = self.settings.resolution_x
-        scene.render.resolution_y = self.settings.resolution_y
-        scene.render.fps = fps
-        scene.frame_start = self.settings.start_frame
-        scene.frame_end = total_frames
+        scene.render.engine = cfg.engine
+        scene.render.resolution_x = cfg.resolution_x
+        scene.render.resolution_y = cfg.resolution_y
+        scene.render.fps = cfg.fps
+        scene.frame_start = cfg.start_frame
+        scene.frame_end = cfg.total_frames
 
+        # The render is about to write here, so this is where the directory is
+        # created — not when the path is merely read.
+        self.settings.ensure_output_dir()
         output_path = Path(self.settings.output_path)
         if self._configure_video_output(scene):
             self.is_png_fallback = False
@@ -49,7 +61,7 @@ class RenderSetup:
                 "Falling back to PNG sequence output."
             )
 
-        print(f"Resolution set to {self.settings.resolution_y}p")
+        print(f"Resolution set to {cfg.resolution_y}p")
 
     def _configure_video_output(self, scene) -> bool:
         try:
@@ -63,7 +75,9 @@ class RenderSetup:
 
     def apply_eevee_enhancements(self) -> None:
         scene = bpy.context.scene
-        if scene.render.engine != "BLENDER_EEVEE":
+        if scene.render.engine != self.config.engine:
+            return
+        if not self.config.engine.startswith("BLENDER_EEVEE"):
             return
 
         try:

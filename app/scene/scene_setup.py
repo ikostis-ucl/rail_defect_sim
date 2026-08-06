@@ -1,8 +1,19 @@
+"""Scene builder — world, units, and lighting.
+
+The *builder* half of the environment. The *data* half is
+``app.config.environment.EnvironmentConfig``.
+"""
+
 import bpy
+
+from app.config import EnvironmentConfig
 
 
 class SceneSetup:
     """Handles high-level scene lifecycle setup."""
+
+    def __init__(self, config: EnvironmentConfig | None = None) -> None:
+        self.config = config if config is not None else EnvironmentConfig()
 
     def setup_metric_units(self) -> None:
         """Set scene unit system to metric with 1 Blender unit = 1 metre."""
@@ -21,14 +32,13 @@ class SceneSetup:
         world.use_nodes = True
         bg_node = world.node_tree.nodes.get("Background")
         if bg_node:
-            bg_node.inputs["Color"].default_value = (0.01, 0.005, 0.002, 1.0)
+            bg_node.inputs["Color"].default_value = self.config.world.background_color
 
     def create_lighting(self) -> None:
         print("Setting up lighting...")
-        bpy.ops.object.light_add(type="SUN", location=(5, 5, 10))
+        sun_cfg = self.config.sun
+        bpy.ops.object.light_add(type="SUN", location=sun_cfg.location)
         sun = bpy.context.active_object
-        sun.data.energy = 5.0
-        # Disable cast shadows for flatter diagnostic renders.
+        sun.data.energy = sun_cfg.energy
         if hasattr(sun.data, "use_shadow"):
-            sun.data.use_shadow = False
-
+            sun.data.use_shadow = sun_cfg.cast_shadows

@@ -18,9 +18,10 @@ class RailwayVideoPipeline:
 
     def __init__(self, settings: PipelineSettings) -> None:
         self.settings = settings
-        self.scene_setup = SceneSetup()
+        self.geometry = settings.geometry
+        self.scene_setup = SceneSetup(settings.environment)
         self.render_setup = RenderSetup(settings)
-        self.material_factory = MaterialFactory()
+        self.material_factory = MaterialFactory(settings.appearance)
         self.track_builder = TrackBuilder(settings, self.material_factory)
         self.camera_animator = CameraAnimator(settings)
 
@@ -30,11 +31,11 @@ class RailwayVideoPipeline:
         self.scene_setup.setup_world()
 
         self.render_setup.apply()
-        self.track_builder.build()
-        
+        self.track_builder.build(self.geometry)
+
         self.scene_setup.create_lighting()
 
-        camera = self.camera_animator.setup_camera()
+        camera = self.camera_animator.setup_camera(self.geometry)
         self.camera_animator.animate(camera)
 
         self.render_setup.apply_eevee_enhancements()
@@ -66,7 +67,7 @@ class RailwayVideoPipeline:
             ffmpeg_bin,
             "-y",
             "-framerate",
-            str(self.settings.fps),
+            str(self.settings.render.fps),
             "-i",
             input_pattern,
             "-c:v",
@@ -96,4 +97,3 @@ class RailwayVideoPipeline:
             removed += 1
         print(f"MP4 assembled successfully: {output_path}")
         print(f"Removed {removed} PNG frame files from fallback sequence.")
-

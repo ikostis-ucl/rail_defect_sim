@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import json
 from dataclasses import dataclass, field
 
-from app.geometry.track_section import TrackSection
+if TYPE_CHECKING:  # pragma: no cover - import only for type checking
+    from app.geometry.track_section import TrackSection
+
 
 
 @dataclass(frozen=True)
