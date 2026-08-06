@@ -5,7 +5,7 @@ from pathlib import Path
 import bpy
 
 from app.camera import CameraAnimator
-from app.config import PipelineSettings
+from app.config import PipelineSettings, TrackGeometryConfig
 from app.geometry import TrackBuilder
 from app.materials import MaterialFactory
 from app.progress import progress_iter, render_progress
@@ -18,9 +18,10 @@ class RailwayVideoPipeline:
 
     def __init__(self, settings: PipelineSettings) -> None:
         self.settings = settings
-        self.scene_setup = SceneSetup()
+        self.geometry = self._load_geometry_config()
+        self.scene_setup = SceneSetup(settings.environment)
         self.render_setup = RenderSetup(settings)
-        self.material_factory = MaterialFactory()
+        self.material_factory = MaterialFactory(settings.appearance)
         self.track_builder = TrackBuilder(settings, self.material_factory)
         self.camera_animator = CameraAnimator(settings)
 
@@ -30,11 +31,11 @@ class RailwayVideoPipeline:
         self.scene_setup.setup_world()
 
         self.render_setup.apply()
-        self.track_builder.build()
-        
+        self.track_builder.build(self.geometry)
+
         self.scene_setup.create_lighting()
 
-        camera = self.camera_animator.setup_camera()
+        camera = self.camera_animator.setup_camera(self.geometry)
         self.camera_animator.animate(camera)
 
         self.render_setup.apply_eevee_enhancements()
@@ -44,6 +45,17 @@ class RailwayVideoPipeline:
         with render_progress(scene, desc="Rendering frames..."):
             bpy.ops.render.render(animation=True)
         self._finalize_output()
+
+    def _load_geometry_config(self) -> TrackGeometryConfig:
+        """Resolve the track geometry once, for every consumer to share.
+
+        The camera datum and the track itself must agree on the geometry, so it
+        is resolved here rather than independently by each builder.
+        """
+        config_path = self.settings.geometry_config_path
+        if config_path:
+            return TrackGeometryConfig.from_yaml(config_path)
+        return TrackGeometryConfig()
 
     def _finalize_output(self) -> None:
         if not self.render_setup.is_png_fallback:
@@ -66,7 +78,7 @@ class RailwayVideoPipeline:
             ffmpeg_bin,
             "-y",
             "-framerate",
-            str(self.settings.fps),
+            str(self.settings.render.fps),
             "-i",
             input_pattern,
             "-c:v",
@@ -96,4 +108,3 @@ class RailwayVideoPipeline:
             removed += 1
         print(f"MP4 assembled successfully: {output_path}")
         print(f"Removed {removed} PNG frame files from fallback sequence.")
-

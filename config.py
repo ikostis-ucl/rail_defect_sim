@@ -119,6 +119,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Camera focal length in mm (lower = wider FOV). Default 35.",
     )
     parser.add_argument(
+        "--camera-sensor-width",
+        type=float,
+        help=(
+            "Camera sensor width in mm. Default 36 (Blender's own default). "
+            "Together with the lens this determines the field of view."
+        ),
+    )
+    parser.add_argument(
+        "--camera-height-reference",
+        type=str,
+        choices=["world", "rail_top"],
+        help=(
+            "How --camera-height is interpreted: 'world' is an absolute Z "
+            "coordinate (default); 'rail_top' is measured above the railhead, "
+            "so the camera keeps its clearance when track geometry changes."
+        ),
+    )
+    parser.add_argument(
         "--camera-accel-seconds",
         type=float,
         help="Ease-in ramp length in seconds before reaching cruising speed. "
@@ -135,36 +153,55 @@ def _extract_script_args(argv: list[str] | None = None) -> list[str]:
     return raw_args[1:]
 
 
+def _override(config, **candidates):
+    """Return *config* with only the non-None *candidates* applied."""
+    provided = {k: v for k, v in candidates.items() if v is not None}
+    return replace(config, **provided) if provided else config
+
+
 def parse_pipeline_settings(argv: list[str] | None = None) -> PipelineSettings:
-    """Parse CLI/config-file arguments and map them to PipelineSettings."""
+    """Parse CLI/config-file arguments and map them to PipelineSettings.
+
+    The CLI surface stays flat (``--camera-height``, ``--fps``) because that is
+    what users and the ``configs/camera/*.yml`` presets write. This function is
+    the single place where that flat surface is folded into the per-domain
+    config objects.
+    """
     parser = build_parser()
     args = parser.parse_args(_extract_script_args(argv))
 
-    settings = PipelineSettings()
+    defaults = PipelineSettings()
 
-    updates = {
-        "fps": args.fps,
-        "duration_seconds": args.duration_seconds,
-        "resolution_x": args.resolution_x,
-        "resolution_y": args.resolution_y,
-        "output_filename": args.output_filename,
-        "render_engine": args.render_engine,
-        "track_length": args.track_length,
-        "base_speed_units_per_frame": args.base_speed_units_per_frame,
-        "geometry_config_path": getattr(args, "geometry_config", None),
-        "force_defect": getattr(args, "force_defect", None),
-        "seed": args.seed,
-        "camera_height": args.camera_height,
-        "camera_lateral_offset": args.camera_lateral_offset,
-        "camera_tilt_deg": args.camera_tilt_deg,
-        "camera_yaw_deg": args.camera_yaw_deg,
-        "camera_roll_deg": args.camera_roll_deg,
-        "camera_lens": args.camera_lens,
-        "camera_accel_seconds": args.camera_accel_seconds,
-    }
-    filtered_updates = {k: v for k, v in updates.items() if v is not None}
+    render = _override(
+        defaults.render,
+        fps=args.fps,
+        duration_seconds=args.duration_seconds,
+        resolution_x=args.resolution_x,
+        resolution_y=args.resolution_y,
+        engine=args.render_engine,
+    )
 
-    if filtered_updates:
-        settings = replace(settings, **filtered_updates)
+    camera = _override(
+        defaults.camera,
+        height=args.camera_height,
+        height_reference=getattr(args, "camera_height_reference", None),
+        lateral_offset=args.camera_lateral_offset,
+        tilt_deg=args.camera_tilt_deg,
+        yaw_deg=args.camera_yaw_deg,
+        roll_deg=args.camera_roll_deg,
+        lens_mm=args.camera_lens,
+        sensor_width_mm=getattr(args, "camera_sensor_width", None),
+        accel_seconds=args.camera_accel_seconds,
+    )
 
-    return settings
+    return _override(
+        defaults,
+        render=render,
+        camera=camera,
+        output_filename=args.output_filename,
+        track_length=args.track_length,
+        base_speed_units_per_frame=args.base_speed_units_per_frame,
+        geometry_config_path=getattr(args, "geometry_config", None),
+        force_defect=getattr(args, "force_defect", None),
+        seed=args.seed,
+    )

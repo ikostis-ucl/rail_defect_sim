@@ -1,49 +1,69 @@
+"""Camera builder — turns a CameraConfig into an animated Blender camera.
+
+This is the *builder* half of the camera. The *data* half is
+``app.config.camera.CameraConfig``, which is ``bpy``-free and holds pose,
+optics, and sensor.
+"""
+
 import math
 
 import bpy
 import mathutils
 
-from app.config import PipelineSettings
+from app.config import PipelineSettings, TrackGeometryConfig
 
 
 class CameraAnimator:
-    """Creates camera rig and applies movement + vibration animation.
-
-    # TODO: Camera placement configs (height, tilt, lateral offset) are currently
-    # expressed as absolute world-space values. They should be defined relative to
-    # the rail viewport — e.g. height as an offset above the railhead, tilt as an
-    # angle from the rail plane — so that the same config remains valid when track
-    # geometry changes (different rail height, sleeper thickness, gauge). Derive
-    # the absolute pose at setup time from geometry + relative camera spec.
-    """
+    """Creates the camera rig and applies movement + vibration animation."""
 
     def __init__(self, settings: PipelineSettings) -> None:
         self.settings = settings
 
-    def setup_camera(self):
+    @property
+    def config(self):
+        return self.settings.camera
+
+    def setup_camera(self, geometry: TrackGeometryConfig):
+        """Create the scene camera.
+
+        *geometry* supplies the railhead datum, so a camera configured with
+        ``height_reference='rail_top'`` keeps its clearance above the rail when
+        the track geometry changes. With ``'world'`` the geometry is unused and
+        the configured height is taken as an absolute Z.
+        """
         print("Setting up camera...")
-        s = self.settings
+        cfg = self.config
+        render = self.settings.render
+
+        world_z = cfg.resolve_world_height(geometry.rail_top_z)
 
         # Compose orientation as a standard yaw → tilt → roll camera rig:
         #   tilt about X (0 = looking straight down -Z, 90 = looking forward +Y),
         #   yaw about world Z (pan left/right), roll about the view axis (bank).
-        tilt = math.radians(s.camera_tilt_deg)
-        yaw = math.radians(s.camera_yaw_deg)
-        roll = math.radians(s.camera_roll_deg)
         rot = (
-            mathutils.Matrix.Rotation(yaw, 4, "Z")
-            @ mathutils.Matrix.Rotation(tilt, 4, "X")
-            @ mathutils.Matrix.Rotation(roll, 4, "Z")
+            mathutils.Matrix.Rotation(math.radians(cfg.yaw_deg), 4, "Z")
+            @ mathutils.Matrix.Rotation(math.radians(cfg.tilt_deg), 4, "X")
+            @ mathutils.Matrix.Rotation(math.radians(cfg.roll_deg), 4, "Z")
         )
 
         bpy.ops.object.camera_add(
-            location=(s.camera_lateral_offset, 0, s.camera_height),
+            location=(cfg.lateral_offset, 0, world_z),
             rotation=rot.to_euler(),
         )
         cam = bpy.context.active_object
         bpy.context.scene.camera = cam
         cam.data.type = "PERSP"
-        cam.data.lens = s.camera_lens
+        cam.data.lens = cfg.lens_mm
+        # Set the sensor explicitly rather than relying on Blender's default, so
+        # the field of view actually rendered matches what CameraConfig computes.
+        cam.data.sensor_width = cfg.sensor_width_mm
+
+        h_fov, v_fov = cfg.fov_deg(render.resolution_x, render.resolution_y)
+        print(
+            f"Camera at Z={world_z:.3f} m "
+            f"({cfg.height:.3f} m relative to {cfg.height_reference}), "
+            f"FOV {h_fov:.1f}° x {v_fov:.1f}°"
+        )
         return cam
 
     def animate(self, camera) -> None:
@@ -53,16 +73,16 @@ class CameraAnimator:
             camera.animation_data_create()
         camera.animation_data_clear()
 
-        fps = self.settings.fps
-        start_frame = self.settings.start_frame
-        total_frames = self.settings.total_frames
-        accel_duration = self.settings.camera_accel_seconds * fps
+        render = self.settings.render
+        fps = render.fps
+        start_frame = render.start_frame
+        total_frames = render.total_frames
+        accel_duration = self.config.accel_seconds * fps
 
         camera.location.y = 0
         camera.keyframe_insert(data_path="location", frame=start_frame, index=1)
 
-        total_distance = self.settings.base_speed_units_per_frame * total_frames
-        camera.location.y = total_distance
+        camera.location.y = self.settings.total_travel_distance
         camera.keyframe_insert(data_path="location", frame=total_frames, index=1)
 
         action = camera.animation_data.action
@@ -115,4 +135,3 @@ class CameraAnimator:
             mod_rot = fcurve_rot_x.modifiers.new(type="NOISE")
             mod_rot.scale = 5.0
             mod_rot.strength = 0.002
-

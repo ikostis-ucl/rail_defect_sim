@@ -1,14 +1,14 @@
-# Canonical locations: app/materials/base.py, rail.py, sleeper.py, etc.
-from app.materials.base import Material
+# Back-compat shim. Canonical locations: app/materials/base.py, rail.py, etc.
+from app.materials.base import Material, NoiseBlendMaterial, PrincipledMaterial
+from app.materials.clip import ClipMaterial
+from app.materials.factory import MaterialFactory
+from app.materials.fastener import FastenerMaterial
+from app.materials.grass import GrassMaterial
 from app.materials.rail import RailMaterial
 from app.materials.sleeper import SleeperMaterial
-from app.materials.grass import GrassMaterial
-from app.materials.clip import ClipMaterial
-from app.materials.fastener import FastenerMaterial
-from app.materials.factory import MaterialFactory
 
 __all__ = [
-    "Material",
+    "Material", "PrincipledMaterial", "NoiseBlendMaterial",
     "RailMaterial", "SleeperMaterial",
     "GrassMaterial", "ClipMaterial", "FastenerMaterial",
     "MaterialFactory",

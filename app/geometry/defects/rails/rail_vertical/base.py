@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import math
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from app.geometry.defects.rails.rail_displacement.base import RailDisplacementDefect
-from app.geometry.track_section import TrackSection
+
+if TYPE_CHECKING:  # pragma: no cover - import only for type checking
+    from app.geometry.track_section import TrackSection
 
 
 class RailVerticalDisplacementDefect(RailDisplacementDefect):

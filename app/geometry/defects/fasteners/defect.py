@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import List
+from typing import TYPE_CHECKING, List
 
-import bpy
 
 from app.geometry.defects.base import Defect
 from app.geometry.defects.variant import DefectVariant
-from app.geometry.track_section import TrackSection
+
+if TYPE_CHECKING:  # pragma: no cover - import only for type checking
+    from app.geometry.track_section import TrackSection
 
 
 class MissingFastenerPairDefect(Defect):
@@ -24,6 +25,10 @@ class MissingFastenerPairDefect(Defect):
 
     @classmethod
     def apply(cls, section: TrackSection, params: dict) -> None:
+        # Imported here rather than at module scope so defect metadata stays
+        # readable outside Blender; apply() only ever runs inside it.
+        import bpy
+
         pair_index = int(params.get("pair_index", 0))
         start_idx = pair_index * 2
         for idx in sorted((start_idx, start_idx + 1), reverse=True):

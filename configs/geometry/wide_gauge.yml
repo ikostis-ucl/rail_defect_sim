@@ -1,6 +1,10 @@
 # tsv-twin track geometry — broad gauge (1520 mm Russian/Soviet standard)
 # All dimensions in metres.
 
+# Rail profile this geometry claims to conform to; validated against
+# the catalog in configs/profiles/.  Previously recorded only in comments.
+profile: UIC60
+
 rail_spacing: 1.520
 
 left_rail:

@@ -77,10 +77,23 @@ class TrackGeometryConfig:
     Use validate() to check for physically impossible combinations.
     """
 
+    # ── Provenance ────────────────────────────────────────────────────────────
+    # Name of the rail profile this geometry is meant to conform to, as a key
+    # into the profile catalog (see app/config/profiles.py).  Without it,
+    # validate_against_profile() has no way to know which standard applies —
+    # the profile was previously recorded only in YAML comments.
+    profile: str = "UIC54"
+
     # ── Rail pair ─────────────────────────────────────────────────────────────
     rail_spacing: float = 1.000   # track gauge: centre-to-centre distance between rail centrelines
     left_rail: RailConfig = field(default_factory=RailConfig)
     right_rail: RailConfig = field(default_factory=RailConfig)
+
+    # Height of the underside of the sleeper above world Z=0.  Every vertical
+    # position in a section is measured up from here, so it is the datum the
+    # whole contact chain (and any camera positioned relative to the railhead)
+    # depends on.
+    base_elevation: float = 0.1
 
     # ── Sleeper ───────────────────────────────────────────────────────────────
     # sleeper_depth: along-track extent of the sleeper body (its "thickness" seen
@@ -107,6 +120,34 @@ class TrackGeometryConfig:
     def section_pitch(self) -> float:
         """Centre-to-centre distance between consecutive sleeper positions (m)."""
         return self.sleeper_depth / self.sleeper_pitch_ratio
+
+    @property
+    def sleeper_top_z(self) -> float:
+        """World Z of the sleeper's upper surface — the rail seat."""
+        return self.base_elevation + self.sleeper_height
+
+    @property
+    def rail_top_z(self) -> float:
+        """World Z of the highest railhead — the datum for camera placement.
+
+        Contact chain: sleeper top → elastomeric pad → rail foot → rail head.
+        The higher of the two rails is used, so a camera positioned relative to
+        this value keeps its clearance even when the rails differ.
+        """
+        return self.sleeper_top_z + max(
+            self.left_rail.pad_thickness + self.left_rail.height + self.left_rail.lift,
+            self.right_rail.pad_thickness + self.right_rail.height + self.right_rail.lift,
+        )
+
+    @property
+    def sleeper_clear_gap(self) -> float:
+        """Free space along track between two adjacent sleeper bodies (m)."""
+        return self.section_pitch - self.sleeper_depth
+
+    @property
+    def sleepers_per_km(self) -> float:
+        """Sleeper count per kilometre — the human-readable form of the pitch."""
+        return 1000.0 / self.section_pitch
 
     # ── Validation ────────────────────────────────────────────────────────────
 
@@ -168,10 +209,14 @@ class TrackGeometryConfig:
 
     def validate_against_profile(
         self,
-        profile_name: str,
+        profile_name: str | None = None,
         tolerance: float = 0.15,
     ) -> tuple["TrackGeometryConfig", list[ValidationIssue]]:
-        """Check every dimension against the named profile's standard values.
+        """Check every dimension against a profile's standard values.
+
+        *profile_name* defaults to this config's own ``profile`` field, so the
+        config carries the standard it claims to follow rather than relying on
+        the caller to remember it.
 
         Returns ``(adjusted_config, issues)``.
 
@@ -190,6 +235,8 @@ class TrackGeometryConfig:
         rail_spacing overlap invariant that validate() enforces).
         """
         from app.config.profiles import PROFILES
+        if profile_name is None:
+            profile_name = self.profile
         if profile_name not in PROFILES:
             return self, []
 
@@ -272,6 +319,7 @@ class TrackGeometryConfig:
             pad_thickness=p.pad_thickness_mm / 1000,
         )
         return cls(
+            profile=profile,
             rail_spacing=gauge_mm / 1000,
             left_rail=rail_cfg,
             right_rail=rail_cfg,

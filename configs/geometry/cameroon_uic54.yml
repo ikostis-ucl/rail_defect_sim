@@ -9,6 +9,10 @@
 # Source: Camrail (Cameroun Railways) permanent-way standards,
 #         UIC leaflet 860 (54E1 cross-section dimensions).
 
+# Rail profile this geometry claims to conform to; validated against
+# the catalog in configs/profiles/.  Previously recorded only in comments.
+profile: UIC54
+
 rail_spacing: 1.000         # Camrail metre gauge
 
 left_rail:

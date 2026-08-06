@@ -1,8 +1,23 @@
+"""
+Top-level pipeline settings.
+
+``PipelineSettings`` is a composition root: it owns one config object per
+domain (render, camera, environment, appearance) plus the run-level values that
+belong to no single domain. Each domain config is a frozen, ``bpy``-free
+dataclass, so a complete run description can be built, inspected, and validated
+without launching Blender.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+from app.config.appearance import AppearanceConfig
+from app.config.camera import CameraConfig
+from app.config.environment import EnvironmentConfig
+from app.config.render import RenderConfig
 
 
 def _default_output_filename() -> str:
@@ -12,34 +27,31 @@ def _default_output_filename() -> str:
 
 @dataclass(frozen=True)
 class PipelineSettings:
-    """Runtime settings for the generation pipeline."""
+    """Everything needed to describe one render, grouped by domain."""
 
-    fps: int = 12
-    duration_seconds: int = 10
-    resolution_x: int = 960
-    resolution_y: int = 540
+    # ── Domain configs ────────────────────────────────────────────────────────
+    render: RenderConfig = field(default_factory=RenderConfig)
+    camera: CameraConfig = field(default_factory=CameraConfig)
+    environment: EnvironmentConfig = field(default_factory=EnvironmentConfig)
+    appearance: AppearanceConfig = field(default_factory=AppearanceConfig)
+
+    # ── Run-level values ──────────────────────────────────────────────────────
     output_filename: str = field(default_factory=_default_output_filename)
-    render_engine: str = "BLENDER_EEVEE"
-    start_frame: int = 1
     track_length: int = 100000
     base_speed_units_per_frame: float = 2.5
-    geometry_config_path: str | None = None  # path to a geometry .yml config file
-    force_defect: str | None = None          # if set, 100% of sections get this defect
-    seed: int = 42                           # RNG seed for defect placement; same seed = same track
 
-    # Camera placement and orientation. Defaults reproduce the original
-    # bird's-eye view (2.45 m above the track centre, looking straight down).
-    camera_height: float = 2.45            # Z position in metres
-    camera_lateral_offset: float = 0.0     # X position in metres (+ = right of track)
-    camera_tilt_deg: float = 0.0           # pitch about X: 0 = straight down, 90 = forward
-    camera_yaw_deg: float = 0.0            # pan about vertical axis (turn left/right)
-    camera_roll_deg: float = 0.0           # bank about the view axis
-    camera_lens: float = 35.0              # focal length in mm (lower = wider FOV)
-    camera_accel_seconds: float = 10.0     # ease-in ramp length; 0 = constant velocity (no acceleration)
+    # Path to a geometry .yml; parsed separately by TrackGeometryConfig.from_yaml
+    # because track dimensions are a distinct config channel from runtime settings.
+    geometry_config_path: str | None = None
+
+    force_defect: str | None = None   # if set, every section gets this defect
+    seed: int = 42                    # RNG seed for defect placement
+
+    # ── Derived ───────────────────────────────────────────────────────────────
 
     @property
     def total_frames(self) -> int:
-        return int(self.duration_seconds * self.fps)
+        return self.render.total_frames
 
     @property
     def run_name(self) -> str:
@@ -55,3 +67,11 @@ class PipelineSettings:
         filename = Path(self.output_filename).name
         return str(run_dir / filename)
 
+    @property
+    def total_travel_distance(self) -> float:
+        """Metres the camera covers over the whole clip.
+
+        Compared against ``track_length`` this says whether the camera runs off
+        the end of the built track.
+        """
+        return self.base_speed_units_per_frame * self.total_frames
