@@ -14,14 +14,23 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from enum import StrEnum
 
 # Blender's default sensor width. It is never set explicitly by the pipeline,
 # so every field-of-view calculation implicitly depends on this value; making
 # it a real field is what allows FOV to be checked before a render.
 DEFAULT_SENSOR_WIDTH_MM = 36.0
 
-WORLD = "world"
-RAIL_TOP = "rail_top"
+
+class HeightReference(StrEnum):
+    """What ``CameraConfig.height`` is measured from."""
+
+    WORLD = "world"
+    """Absolute world-Z coordinate."""
+
+    RAIL_TOP = "rail_top"
+    """Metres above the railhead; the absolute Z is derived from the track
+    geometry at setup time, so clearance survives a geometry change."""
 
 
 @dataclass(frozen=True)
@@ -30,20 +39,23 @@ class CameraConfig:
 
     ``height_reference`` decides how ``height`` is interpreted:
 
-      ``world``     — height is an absolute world-Z coordinate (legacy behaviour).
-      ``rail_top``  — height is measured *above the top of the rail*, and the
+      ``WORLD``     — height is an absolute world-Z coordinate (legacy behaviour).
+      ``RAIL_TOP``  — height is measured *above the top of the rail*, and the
                       absolute Z is derived from the active track geometry at
                       setup time.
 
-    ``rail_top`` is the meaningful frame of reference for a real inspection
+    ``RAIL_TOP`` is the meaningful frame of reference for a real inspection
     camera: a cab window sits a fixed distance above the railhead regardless of
     sleeper height or rail profile. With ``world``, changing the track geometry
     silently moves the camera relative to the track.
+
+    Comparisons against plain strings still work: ``HeightReference`` is a
+    ``StrEnum``, so a value loaded from YAML as ``"rail_top"`` behaves correctly.
     """
 
     # ── Placement ─────────────────────────────────────────────────────────────
     height: float = 2.45                 # see height_reference
-    height_reference: str = WORLD
+    height_reference: HeightReference = HeightReference.WORLD
     lateral_offset: float = 0.0          # X; positive is right of track centre
 
     # ── Orientation ───────────────────────────────────────────────────────────
@@ -122,11 +134,11 @@ class CameraConfig:
         ``'world'`` the configured height is already absolute and is returned
         unchanged.
         """
-        if self.height_reference == RAIL_TOP:
+        if self.height_reference == HeightReference.RAIL_TOP:
             return rail_top_z + self.height
-        if self.height_reference == WORLD:
+        if self.height_reference == HeightReference.WORLD:
             return self.height
         raise ValueError(
-            f"Unknown height_reference {self.height_reference!r}; "
-            f"expected {WORLD!r} or {RAIL_TOP!r}"
+            f"Unknown height_reference {self.height_reference!r}; expected one of "
+            f"{[m.value for m in HeightReference]}"
         )

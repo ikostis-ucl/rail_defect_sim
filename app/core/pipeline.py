@@ -5,7 +5,7 @@ from pathlib import Path
 import bpy
 
 from app.camera import CameraAnimator
-from app.config import PipelineSettings, TrackGeometryConfig
+from app.config import PipelineSettings
 from app.geometry import TrackBuilder
 from app.materials import MaterialFactory
 from app.progress import progress_iter, render_progress
@@ -18,7 +18,7 @@ class RailwayVideoPipeline:
 
     def __init__(self, settings: PipelineSettings) -> None:
         self.settings = settings
-        self.geometry = self._load_geometry_config()
+        self.geometry = settings.geometry
         self.scene_setup = SceneSetup(settings.environment)
         self.render_setup = RenderSetup(settings)
         self.material_factory = MaterialFactory(settings.appearance)
@@ -45,17 +45,6 @@ class RailwayVideoPipeline:
         with render_progress(scene, desc="Rendering frames..."):
             bpy.ops.render.render(animation=True)
         self._finalize_output()
-
-    def _load_geometry_config(self) -> TrackGeometryConfig:
-        """Resolve the track geometry once, for every consumer to share.
-
-        The camera datum and the track itself must agree on the geometry, so it
-        is resolved here rather than independently by each builder.
-        """
-        config_path = self.settings.geometry_config_path
-        if config_path:
-            return TrackGeometryConfig.from_yaml(config_path)
-        return TrackGeometryConfig()
 
     def _finalize_output(self) -> None:
         if not self.render_setup.is_png_fallback:

@@ -9,7 +9,8 @@ try:
 except ModuleNotFoundError:
     configargparse = None
 
-from app.config import PipelineSettings
+from app.config import PipelineSettings, TrackGeometryConfig
+from app.config.camera import HeightReference
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -129,7 +130,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--camera-height-reference",
         type=str,
-        choices=["world", "rail_top"],
+        choices=[m.value for m in HeightReference],
         help=(
             "How --camera-height is interpreted: 'world' is an absolute Z "
             "coordinate (default); 'rail_top' is measured above the railhead, "
@@ -194,10 +195,19 @@ def parse_pipeline_settings(argv: list[str] | None = None) -> PipelineSettings:
         accel_seconds=args.camera_accel_seconds,
     )
 
+    # Resolve the geometry file here rather than inside the pipeline, so a
+    # complete run is fully described — and therefore validatable — before
+    # Blender is ever launched.
+    geometry_path = getattr(args, "geometry_config", None)
+    geometry = (
+        TrackGeometryConfig.from_yaml(geometry_path) if geometry_path else defaults.geometry
+    )
+
     return _override(
         defaults,
         render=render,
         camera=camera,
+        geometry=geometry,
         output_filename=args.output_filename,
         track_length=args.track_length,
         base_speed_units_per_frame=args.base_speed_units_per_frame,

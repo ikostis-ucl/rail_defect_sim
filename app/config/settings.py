@@ -17,6 +17,7 @@ from pathlib import Path
 from app.config.appearance import AppearanceConfig
 from app.config.camera import CameraConfig
 from app.config.environment import EnvironmentConfig
+from app.config.geometry import TrackGeometryConfig
 from app.config.render import RenderConfig
 
 
@@ -34,14 +35,16 @@ class PipelineSettings:
     camera: CameraConfig = field(default_factory=CameraConfig)
     environment: EnvironmentConfig = field(default_factory=EnvironmentConfig)
     appearance: AppearanceConfig = field(default_factory=AppearanceConfig)
+    geometry: TrackGeometryConfig = field(default_factory=TrackGeometryConfig)
 
     # ── Run-level values ──────────────────────────────────────────────────────
     output_filename: str = field(default_factory=_default_output_filename)
     track_length: int = 100000
     base_speed_units_per_frame: float = 2.5
 
-    # Path to a geometry .yml; parsed separately by TrackGeometryConfig.from_yaml
-    # because track dimensions are a distinct config channel from runtime settings.
+    # Provenance only: which .yml `geometry` was loaded from, or None for
+    # defaults. The geometry itself is resolved at parse time so that a complete
+    # run can be validated before Blender is launched.
     geometry_config_path: str | None = None
 
     force_defect: str | None = None   # if set, every section gets this defect
@@ -60,12 +63,26 @@ class PipelineSettings:
         return stem or filename
 
     @property
-    def output_path(self) -> str:
+    def output_dir(self) -> Path:
+        """Directory this run writes into. Pure — creates nothing."""
         project_root = Path(__file__).resolve().parents[2]
-        run_dir = project_root / "data" / "output" / self.run_name
-        run_dir.mkdir(parents=True, exist_ok=True)
-        filename = Path(self.output_filename).name
-        return str(run_dir / filename)
+        return project_root / "data" / "output" / self.run_name
+
+    @property
+    def output_path(self) -> str:
+        """Full path of the output file. Pure — creates nothing.
+
+        Reading a config value must never touch the filesystem: pre-render
+        validation inspects these settings, and it would otherwise litter
+        ``data/output/`` with directories for runs that were rejected and never
+        happened. Call ``ensure_output_dir()`` when actually about to write.
+        """
+        return str(self.output_dir / Path(self.output_filename).name)
+
+    def ensure_output_dir(self) -> Path:
+        """Create the output directory, and return it. The only side effect here."""
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        return self.output_dir
 
     @property
     def total_travel_distance(self) -> float:

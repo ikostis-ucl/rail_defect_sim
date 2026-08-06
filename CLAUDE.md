@@ -105,7 +105,6 @@ app/
       manifest.py           CacheManifest — cache_index.json inventory
       prototype.py          TrackSectionCache (healthy prototypes)
       defective.py          DefectiveSectionCache (defect variants)
-    track_section_cache.py  thin re-export shim → cache/ (back-compat)
     defects/              Defect system (package, bpy-free metadata): base, variant, registry, selector, plus per-component subpackages (rails/, fasteners/, sleepers/, ground/, ballast/)
     track_builder.py      Builds the full track by instantiating cached sections
   camera/                 CameraAnimator — builds/animates the camera from CameraConfig
@@ -113,7 +112,6 @@ app/
     base.py                 Material ABC + PrincipledMaterial + NoiseBlendMaterial
     rail.py / sleeper.py / fastener.py / clip.py / grass.py   named types (NAME only)
     factory.py              MaterialFactory — pairs each type with its appearance
-    material_factory.py     thin re-export shim → the modules above (back-compat)
   render/                 render settings + PNG→MP4 fallback via ffmpeg
   scene/                  SceneSetup — world, units, lighting from EnvironmentConfig
 configs/

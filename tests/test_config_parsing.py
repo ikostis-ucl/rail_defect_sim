@@ -110,3 +110,29 @@ def test_blender_argument_passthrough_is_stripped():
 def test_travel_distance_reflects_parsed_values():
     s = parse("--fps", "10", "--duration-seconds", "10", "--base-speed-units-per-frame", "0.5")
     assert s.total_travel_distance == pytest.approx(50.0)
+
+
+# ── Geometry resolution ───────────────────────────────────────────────────────
+
+def test_geometry_defaults_when_no_file_given():
+    from app.config import TrackGeometryConfig
+
+    s = parse()
+    assert s.geometry == TrackGeometryConfig()
+    assert s.geometry_config_path is None
+
+
+def test_geometry_file_is_resolved_at_parse_time():
+    """Not just stored as a path — loaded, so validation can run pre-Blender."""
+    s = parse("--geometry-config", "configs/geometry/wide_gauge.yml")
+    assert s.geometry_config_path == "configs/geometry/wide_gauge.yml"
+    assert s.geometry.rail_spacing == pytest.approx(1.520)
+    assert s.geometry.profile == "UIC60"
+
+
+def test_resolved_geometry_exposes_the_railhead_datum():
+    """The value the camera datum needs, available before Blender starts."""
+    default = parse().geometry.rail_top_z
+    broad = parse("--geometry-config", "configs/geometry/wide_gauge.yml").geometry.rail_top_z
+    assert default == pytest.approx(0.466)
+    assert broad == pytest.approx(0.397)

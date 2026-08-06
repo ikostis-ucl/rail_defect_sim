@@ -1,5 +1,7 @@
 """PipelineSettings as a composition root over the per-domain configs."""
 
+from pathlib import Path
+
 import pytest
 
 from app.config import (
@@ -114,3 +116,55 @@ def test_custom_values_round_trip():
     )
     assert s.render.fps == 30
     assert s.render.total_frames == 1800
+
+
+# ── Geometry is resolved config, not a path ───────────────────────────────────
+
+def test_geometry_is_a_resolved_config_object():
+    """Every domain has its config on settings — geometry included.
+
+    It used to be only a path, resolved inside RailwayVideoPipeline, which meant
+    a run could not be fully described before Blender launched.
+    """
+    from app.config import TrackGeometryConfig
+
+    s = PipelineSettings()
+    assert isinstance(s.geometry, TrackGeometryConfig)
+    assert s.geometry_config_path is None  # provenance only
+
+
+def test_geometry_derived_values_reachable_from_settings():
+    """The railhead datum the camera needs is available without Blender."""
+    assert PipelineSettings().geometry.rail_top_z == pytest.approx(0.466)
+
+
+# ── output_path purity ────────────────────────────────────────────────────────
+
+def test_output_path_does_not_touch_the_filesystem():
+    """Reading a config value must never create directories.
+
+    Pre-render validation inspects these settings; if reading the path created
+    the directory, every rejected run would still litter data/output/.
+    """
+    s = PipelineSettings(output_filename="never_rendered_probe_run.mp4")
+    if s.output_dir.exists():                     # left over from an earlier run
+        s.output_dir.rmdir()
+    _ = s.output_path
+    _ = s.output_dir
+    assert not s.output_dir.exists()
+
+
+def test_ensure_output_dir_creates_it_and_is_idempotent():
+    s = PipelineSettings(output_filename="ensure_probe_run.mp4")
+    try:
+        created = s.ensure_output_dir()
+        assert created.is_dir()
+        assert s.ensure_output_dir() == created   # safe to call twice
+    finally:
+        if s.output_dir.exists():
+            s.output_dir.rmdir()
+
+
+def test_output_path_sits_inside_output_dir():
+    s = PipelineSettings(output_filename="somewhere.mp4")
+    assert Path(s.output_path).parent == s.output_dir

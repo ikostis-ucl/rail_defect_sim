@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-RGBA = tuple
+from app.config.types import RGBA
 
 
 @dataclass(frozen=True)

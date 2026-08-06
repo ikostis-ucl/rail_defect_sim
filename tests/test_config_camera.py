@@ -5,7 +5,7 @@ import math
 import pytest
 
 from app.config import TrackGeometryConfig
-from app.config.camera import RAIL_TOP, WORLD, CameraConfig
+from app.config.camera import CameraConfig, HeightReference
 
 
 # ── Sensor geometry ───────────────────────────────────────────────────────────
@@ -83,13 +83,13 @@ def test_nonpositive_lens_rejected():
 # ── Height datum ──────────────────────────────────────────────────────────────
 
 def test_world_reference_ignores_geometry():
-    cfg = CameraConfig(height=2.45, height_reference=WORLD)
+    cfg = CameraConfig(height=2.45, height_reference=HeightReference.WORLD)
     assert cfg.resolve_world_height(TrackGeometryConfig().rail_top_z) == 2.45
 
 
 def test_rail_top_reference_adds_the_railhead_datum():
     geometry = TrackGeometryConfig()
-    cfg = CameraConfig(height=1.0, height_reference=RAIL_TOP)
+    cfg = CameraConfig(height=1.0, height_reference=HeightReference.RAIL_TOP)
     assert cfg.resolve_world_height(geometry.rail_top_z) == pytest.approx(
         geometry.rail_top_z + 1.0
     )
@@ -97,7 +97,7 @@ def test_rail_top_reference_adds_the_railhead_datum():
 
 def test_rail_top_reference_tracks_changing_geometry():
     """The whole point: clearance above the rail survives a geometry change."""
-    cfg = CameraConfig(height=1.0, height_reference=RAIL_TOP)
+    cfg = CameraConfig(height=1.0, height_reference=HeightReference.RAIL_TOP)
     default = TrackGeometryConfig()
     shallower = TrackGeometryConfig(sleeper_height=0.130)
 
@@ -115,3 +115,20 @@ def test_unknown_height_reference_rejected():
 def test_config_is_frozen():
     with pytest.raises(Exception):
         CameraConfig().lens_mm = 50  # type: ignore[misc]
+
+
+# ── HeightReference enum ──────────────────────────────────────────────────────
+
+def test_height_reference_values():
+    assert HeightReference.WORLD == "world"
+    assert HeightReference.RAIL_TOP == "rail_top"
+
+
+def test_height_reference_accepts_plain_strings_from_yaml():
+    """StrEnum: a value loaded from YAML as a bare string still resolves."""
+    cfg = CameraConfig(height=1.0, height_reference="rail_top")
+    assert cfg.resolve_world_height(0.466) == pytest.approx(1.466)
+
+
+def test_default_height_reference_is_world():
+    assert CameraConfig().height_reference is HeightReference.WORLD

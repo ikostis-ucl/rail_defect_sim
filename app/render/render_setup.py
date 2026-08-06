@@ -40,6 +40,9 @@ class RenderSetup:
         scene.frame_start = cfg.start_frame
         scene.frame_end = cfg.total_frames
 
+        # The render is about to write here, so this is where the directory is
+        # created — not when the path is merely read.
+        self.settings.ensure_output_dir()
         output_path = Path(self.settings.output_path)
         if self._configure_video_output(scene):
             self.is_png_fallback = False
