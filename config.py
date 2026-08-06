@@ -80,6 +80,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        help=(
+            "RNG seed for defect placement. The same seed always produces the same "
+            "sequence of defects along the track. Default 42; vary it to generate "
+            "distinct datasets from otherwise identical settings."
+        ),
+    )
+    parser.add_argument(
         "--camera-height",
         type=float,
         help="Camera height (Z) in metres. Default 2.45.",
@@ -144,6 +153,7 @@ def parse_pipeline_settings(argv: list[str] | None = None) -> PipelineSettings:
         "base_speed_units_per_frame": args.base_speed_units_per_frame,
         "geometry_config_path": getattr(args, "geometry_config", None),
         "force_defect": getattr(args, "force_defect", None),
+        "seed": args.seed,
         "camera_height": args.camera_height,
         "camera_lateral_offset": args.camera_lateral_offset,
         "camera_tilt_deg": args.camera_tilt_deg,

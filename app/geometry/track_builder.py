@@ -59,10 +59,12 @@ class TrackBuilder:
         move_to_collection(track_parent, track_sections_collection)
 
         force_defect = getattr(self.settings, "force_defect", None)
+        seed = getattr(self.settings, "seed", None)
+        print(f"Defect placement seed: {seed}")
         defect_selector = (
-            DefectSelector.forced(force_defect)
+            DefectSelector.forced(force_defect, seed=seed)
             if force_defect
-            else DefectSelector.default()
+            else DefectSelector.default(seed=seed)
         )
         defective_collections = {}
         for variant in defect_selector.all_variants():
