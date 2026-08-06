@@ -1,6 +1,8 @@
 # tsv-twin
 
-Procedural railway track renderer that generates synthetic, annotated video sequences for AI training. Built on Blender's Python API (`bpy`).
+Procedural railway track renderer that generates synthetic video sequences of defective track for training defect-detection AI. Built on Blender's Python API (`bpy`).
+
+Goal: cover **track-geometry deviations**, which are effectively absent from public railway datasets (those skew heavily toward rail-surface defects). Part of the Track Sentry Vision (TSV) project — see `docs/project_description.pdf`. Annotated output is the intended end state but is **not implemented yet** (see Output).
 
 ## Critical: execution model
 
@@ -29,6 +31,17 @@ Use the preset scripts in `runtime/` — pick based on what you need:
 | `final_fullhd.sh` | 1920×1080 | 60 s | Production Full HD |
 | `final_4k.sh` | 3840×2160 | 60 s | Production 4K |
 
+Alongside the quality presets, `runtime/` also holds:
+
+| Script | Use for |
+|---|---|
+| `smoke_test.sh` | Minimal end-to-end run |
+| `smoke_displacement.sh` | Forces `right_rail_lateral_displacement` at 100 %, slow camera — verifying a defect renders |
+| `cameroon_birds_eye.sh`, `cameroon_windshield.sh`, `cameroon_roof_far.sh`, `cameroon_low_inspection.sh`, `cameroon_drone_three_quarter.sh` | Camera-angle demos on Cameroon metre gauge; each loads a `configs/camera/*.yml` |
+| `camera_demos.sh` | Runs the whole camera-angle set in one go |
+
+Every `.sh` has a PowerShell mirror in `runtime/windows/*.ps1`.
+
 All scripts accept extra `--` args forwarded to `config.py` (e.g. `--output-filename my_test.mp4`).
 
 Output lands in `data/output/<run_name>/`.
@@ -54,10 +67,21 @@ app/
     defects/              Defect system (package): base, variant, registry, selector, plus per-component subpackages (rails/, fasteners/, sleepers/, ground/, ballast/)
     track_builder.py      Builds the full track by instantiating cached sections
   camera/                 camera setup and animation
-  materials/
-    material_factory.py   Material abstract base + concrete types + MaterialFactory coordinator
+  materials/              one module per material:
+    base.py                 Material abstract base
+    rail.py / sleeper.py / fastener.py / clip.py / grass.py   concrete types
+    factory.py              MaterialFactory coordinator
+    material_factory.py     thin re-export shim → the modules above (back-compat)
   render/                 render settings + PNG→MP4 fallback via ffmpeg
   scene/                  scene/world/lighting setup
+configs/
+  camera/                 camera pose presets (birds_eye, windshield, roof_far,
+                          low_inspection, drone_three_quarter) — pass with --config
+  geometry/               track geometry presets (default, cameroon_uic54, wide_gauge)
+                          — pass with --geometry-config
+  profiles/               rail profile specs (uic54, uic60, 115re) — auto-loaded at
+                          import by app/config/profiles.py, overriding the built-in
+                          dicts; no flag needed
 assets/
   track_section_cache/          healthy section prototypes (.blend files)
   track_section_cache/defective/  defective section prototypes (.blend files)
@@ -108,18 +132,31 @@ The rail-displacement defects share a `RailDisplacementDefect` base (`rails/rail
 
 ### Forcing a specific defect
 
-There is no CLI flag yet — edit `DefectSelector.default()` in `selector.py` to register only the defect you want and raise the rate:
+Pass `--force-defect <NAME>` using a `NAME` from the table above. Every section then
+receives that defect (100 % rate), with multi-section spans queued so the profile stays
+continuous:
 
-```python
-selector.DEFECT_PROBABILITY = 1.0                      # every eligible section
-for defect_class in ALL_DEFECTS:
-    if defect_class.NAME != "both_rails_gauge_widening":  # ← your NAME from the table
-        continue
-    for span_group in defect_class.span_groups():
-        selector.register_span(span_group)
+```bash
+./runtime/draft_quick.sh --force-defect both_rails_gauge_widening
 ```
 
-Revert both changes to restore the random mix. At `1.0` the displacement spans run back-to-back; lower the probability for healthy track between occurrences.
+Omit the flag to restore the random mix at `DEFECT_PROBABILITY` (10 %). At 100 % the
+displacement spans run back-to-back with no healthy track between occurrences.
+
+### Reproducibility
+
+Defect placement is seeded: `--seed <int>`, **default 42**. The same seed and the same
+settings always produce the same sequence of defects along the track. Vary the seed to
+generate distinct datasets from otherwise identical settings:
+
+```bash
+./runtime/draft_quick.sh --seed 7
+```
+
+The seed is echoed at build time (`Defect placement seed: 42`) so a render's layout can be
+traced back from its log. It governs *defect placement only*; camera vibration is driven
+by Blender's own NOISE f-curve modifiers, which are configured separately in
+`app/camera/camera_animator.py`.
 
 ## Section caching
 
@@ -137,6 +174,33 @@ The first render builds section prototypes (healthy + one per defect variant) an
 
 Settings flow: CLI args (or `TSV_TWIN_*` env vars) → `config.py` → `PipelineSettings` dataclass. All settings have defaults; CLI args only override when explicitly provided. A config file (yaml/ini/key=value) can be passed with `--config <path>` (requires `configargparse`, which is installed).
 
+There are **two independent config channels** — don't confuse them:
+
+- `--config <path>` → runtime settings (camera pose, fps, resolution). Presets in `configs/camera/`.
+- `--geometry-config <path>` → track dimensions, parsed by `TrackGeometryConfig.from_yaml()`, never touched by `config.py`. Presets in `configs/geometry/`.
+
+Both can be used in the same run:
+
+```bash
+./runtime/draft_quick.sh --config configs/camera/windshield.yml \
+                        --geometry-config configs/geometry/cameroon_uic54.yml
+```
+
 ## Output
 
+A run produces **video only** — `data/output/<run_name>/<run_name>.mp4`. There is no
+annotation/label sidecar yet: `TrackBuilder` knows each section's index, Y position, and
+`DefectVariant`, but discards that after building. Emitting it is what turns these renders
+into a trainable dataset (see the project proposal in `docs/project_description.pdf`).
+
 If the Blender build lacks a video codec, the render falls back to a PNG frame sequence and assembles it to MP4 via `ffmpeg`. If `ffmpeg` is not installed, the PNG sequence is kept as-is.
+
+## Tests
+
+```bash
+pytest              # 267 tests, ~0.3 s
+```
+
+Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub
+for `bpy` before any app import, so geometry maths, config, defects, and cache logic are all
+testable without launching Blender. Tests needing specific `bpy` behaviour patch the stub.

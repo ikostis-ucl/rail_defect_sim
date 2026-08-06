@@ -25,6 +25,7 @@ class PipelineSettings:
     base_speed_units_per_frame: float = 2.5
     geometry_config_path: str | None = None  # path to a geometry .yml config file
     force_defect: str | None = None          # if set, 100% of sections get this defect
+    seed: int = 42                           # RNG seed for defect placement; same seed = same track
 
     # Camera placement and orientation. Defaults reproduce the original
     # bird's-eye view (2.45 m above the track centre, looking straight down).
