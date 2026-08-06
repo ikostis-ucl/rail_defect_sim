@@ -61,11 +61,12 @@ class TrackBuilder:
 
         force_defect = self.settings.force_defect
         seed = self.settings.seed
-        print(f"Defect placement seed: {seed}")
+        defect_rate = self.settings.defect_rate
+        print(f"Defect placement seed: {seed}, rate: {defect_rate:.0%}")
         defect_selector = (
             DefectSelector.forced(force_defect, seed=seed)
             if force_defect
-            else DefectSelector.default(seed=seed)
+            else DefectSelector.default(seed=seed, probability=defect_rate)
         )
         defective_collections = {}
         for variant in defect_selector.all_variants():

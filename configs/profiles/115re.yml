@@ -2,7 +2,7 @@
 # Source: AREMA Manual for Railway Engineering, Chapter 4.
 #
 # These values are the *reference* used by validate_against_profile("115RE").
-# All linear dimensions in millimetres.  sleeper_pitch_ratio is dimensionless.
+# All linear dimensions in millimetres.
 
 name: 115RE
 standard: AREMA 115RE
@@ -14,10 +14,9 @@ height_mm: 184.2
 # Sleeper — concrete crosstie at 1 435 mm gauge
 #   Along-track depth = 260 mm.
 #   Typical pitch ≈ 600 mm (US Class I concrete tie standard).
-#   section_pitch = 0.260 / 0.433 ≈ 0.600 m
 sleeper_depth_mm: 260.0
 sleeper_height_mm: 210.0
-sleeper_pitch_ratio: 0.433     # 260 mm / 600 mm ≈ 0.433
+section_pitch_mm: 600.0     # centre-to-centre sleeper spacing
 
 # Fasteners — Pandrol e-clip / Safelok style
 clip_diameter_mm: 14.0

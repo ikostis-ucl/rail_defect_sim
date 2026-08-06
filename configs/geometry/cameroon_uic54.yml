@@ -20,23 +20,19 @@ left_rail:
   foot_width: 0.140         # base flange width — drives fastener seat positions
   height: 0.159             # total rail height from foot bottom to head top
   pad_thickness: 0.007      # EVA/rubber pad between rail foot and sleeper surface
-  lift: 0.0
-  angle: 0.0
 
 right_rail:
   head_width: 0.070
   foot_width: 0.140
   height: 0.159
   pad_thickness: 0.007
-  lift: 0.0
-  angle: 0.0
 
 # Camrail concrete monoblock sleeper: 200 mm along-track depth
 sleeper_depth: 0.200
 sleeper_height: 0.200
 
-# 0.200 / 0.320 = 0.625 m pitch (mid-range of 600–660 mm Camrail standard)
-sleeper_pitch_ratio: 0.320
+# Centre-to-centre sleeper spacing, in metres.
+section_pitch: 0.625
 
 screw_radius: 0.0065        # Nabla/Vossloh SKL clip: 13 mm diameter → 6.5 mm radius
 screw_length: 0.035         # clip protrusion above sleeper surface

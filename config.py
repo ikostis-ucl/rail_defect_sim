@@ -81,6 +81,16 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--defect-rate",
+        type=float,
+        help=(
+            "Fraction of sections that start a defect, 0.0-1.0. Default 0.10. "
+            "Sets the balance of healthy to faulty examples in the dataset. "
+            "Multi-section defects occupy follower sections too, so the share of "
+            "defective sections ends up several times this value."
+        ),
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         help=(
@@ -214,4 +224,5 @@ def parse_pipeline_settings(argv: list[str] | None = None) -> PipelineSettings:
         geometry_config_path=getattr(args, "geometry_config", None),
         force_defect=getattr(args, "force_defect", None),
         seed=args.seed,
+        defect_rate=getattr(args, "defect_rate", None),
     )

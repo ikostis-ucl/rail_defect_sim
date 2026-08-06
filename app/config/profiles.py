@@ -37,8 +37,8 @@ class RailProfileSpec:
     ``TrackGeometryConfig.validate_against_profile()``.
 
     All linear dimensions are in millimetres.
-    ``sleeper_pitch_ratio`` is dimensionless:
-        section_pitch [m] = (sleeper_depth_mm / 1000) / sleeper_pitch_ratio
+    ``section_pitch_mm`` is the centre-to-centre sleeper spacing the standard
+    specifies.
     """
 
     name: str               # short identifier, doubles as catalog key (e.g. "UIC54")
@@ -51,17 +51,13 @@ class RailProfileSpec:
 
     # ── Sleeper ───────────────────────────────────────────────────────────────
     # sleeper_depth_mm: along-track extent of the sleeper body.
-    # Together with sleeper_pitch_ratio it determines centre-to-centre pitch:
-    #   section_pitch [m] = (sleeper_depth_mm / 1000) / sleeper_pitch_ratio
-    #
-    # clear gap between adjacent sleepers = section_pitch - sleeper_depth_mm/1000
+    # clear gap between adjacent sleepers = section_pitch_mm - sleeper_depth_mm
     sleeper_depth_mm: float
 
     sleeper_height_mm: float    # vertical sleeper dimension (Z axis)
 
-    # sleeper_pitch_ratio: fraction of section_pitch occupied by the sleeper body.
-    # Equivalently: sleeper_depth / section_pitch.  Must be in (0, 1).
-    sleeper_pitch_ratio: float
+    # Centre-to-centre sleeper spacing mandated by the standard, in mm.
+    section_pitch_mm: float
 
     # ── Fasteners ─────────────────────────────────────────────────────────────
     clip_diameter_mm: float     # elastic spring-steel clip rod diameter
@@ -131,7 +127,7 @@ def _builtin_profiles() -> Dict[str, RailProfileSpec]:
             height_mm=159.0,
             sleeper_depth_mm=200.0,
             sleeper_height_mm=200.0,
-            sleeper_pitch_ratio=0.320,   # 200 mm / 625 mm = 0.320
+            section_pitch_mm=625.0,      # mid-range of the 600-660 mm Camrail spec
             clip_diameter_mm=13.0,
             clip_height_mm=30.0,
             pad_thickness_mm=7.0,
@@ -148,7 +144,7 @@ def _builtin_profiles() -> Dict[str, RailProfileSpec]:
             height_mm=172.0,
             sleeper_depth_mm=260.0,
             sleeper_height_mm=220.0,
-            sleeper_pitch_ratio=0.400,   # 260 mm / 650 mm = 0.400
+            section_pitch_mm=650.0,      # B70/B75 standard-gauge spacing
             clip_diameter_mm=13.0,
             clip_height_mm=30.0,
             pad_thickness_mm=7.0,
@@ -165,7 +161,7 @@ def _builtin_profiles() -> Dict[str, RailProfileSpec]:
             height_mm=184.2,
             sleeper_depth_mm=260.0,
             sleeper_height_mm=210.0,
-            sleeper_pitch_ratio=0.433,   # 260 mm / 600 mm ≈ 0.433
+            section_pitch_mm=600.0,      # US Class I concrete tie standard
             clip_diameter_mm=14.0,
             clip_height_mm=35.0,
             pad_thickness_mm=8.0,

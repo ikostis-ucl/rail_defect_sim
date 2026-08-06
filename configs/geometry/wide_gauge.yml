@@ -12,20 +12,21 @@ left_rail:
   foot_width: 0.150       # base flange width — drives fastener seat positions
   height: 0.160           # total rail height from foot bottom to head top
   pad_thickness: 0.007    # elastomeric pad between rail foot and sleeper surface
-  lift: 0.0
-  angle: 0.0
 
 right_rail:
   head_width: 0.070
   foot_width: 0.150
   height: 0.160
   pad_thickness: 0.007
-  lift: 0.0
-  angle: 0.0
 
 sleeper_depth: 0.115      # along-track sleeper depth (NOT the cross-track length)
 sleeper_height: 0.130
-sleeper_pitch_ratio: 0.62
+# Centre-to-centre sleeper spacing, in metres.
+# KNOWN BAD — see issue #17. 0.185 m means 5 391 sleepers/km against a realistic
+# 1 600-1 800, and only a 70 mm gap between sleeper bodies. Preserved verbatim
+# from the old ratio form (0.115 / 0.62) so the sleeper-pitch constraints have a
+# real failing case to catch. A 1520 mm gauge wants roughly 0.50-0.55 m.
+section_pitch: 0.185
 
 screw_radius: 0.016
 screw_length: 0.055

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from typing import List
 
 import bpy
@@ -21,9 +20,9 @@ class TrackSection:
       - One merged sleeper spanning the full cross-track width (concrete monoblock)
       - Eight fastener cylinders distributed across the sleeper
 
-    All geometry dimensions come from a TrackGeometryConfig.
-    section_pitch (the Y span of this section) is derived:
-        section_pitch = config.sleeper_depth / config.sleeper_pitch_ratio
+    All geometry dimensions come from a TrackGeometryConfig, including
+    section_pitch — the Y span of this section — which is a plain distance in
+    metres rather than a derived ratio.
     """
 
     SECTION_PARENT_ROLE = "section_parent"
@@ -111,7 +110,6 @@ class TrackSection:
         rail.name = "RailPiece"
         rail.scale = (rail_cfg.head_width, cfg.section_pitch, rail_cfg.height)
         rail.location = (x + x_offset, y, self._rail_center_z(z, rail_cfg))
-        rail.rotation_euler[2] = math.radians(rail_cfg.angle)
         self._register(rail, role=role, collection=collection,
                        parent=self.section_parent, material=self.rail_material)
         return rail
@@ -222,27 +220,21 @@ class TrackSection:
         Contact chain (bottom → top):
           sleeper top = base_z + sleeper_height
           pad top     = sleeper_top + pad_thickness   ← rail foot starts here
-          rail centre = pad_top + height/2 + lift
+          rail centre = pad_top + height/2
         """
         return (
             self._sleeper_top_z(base_z)
             + rail_cfg.pad_thickness
             + rail_cfg.height / 2
-            + rail_cfg.lift
         )
 
     def _fastener_depth(self, rail_cfg: RailConfig) -> float:
         """Fastener length that guarantees the clip reaches the rail foot.
 
-        Standard length is used when the rail sits flush on its pad.  When a
-        defect introduces a *lift* gap, the fastener grows to bridge it so the
-        clip stays in contact with the rail flange rather than floating in air.
-
-        The standard dimension is the lower bound; the rendered dimension is
-        always at least pad_thickness + lift so there is no gap.
+        The clip must at minimum bridge the pad between sleeper and rail foot,
+        so the standard clip length acts as the lower bound.
         """
-        gap = rail_cfg.pad_thickness + rail_cfg.lift
-        return max(self.config.screw_length, gap)
+        return max(self.config.screw_length, rail_cfg.pad_thickness)
 
     # ------------------------------------------------------------------
     # Contiguity correction
@@ -252,19 +244,15 @@ class TrackSection:
         """Re-apply exact Z positions to guarantee all components are contiguous.
 
         Call this after build() (already done automatically) and again after
-        any defect.apply() that modifies rail lift or sleeper height.
+        any defect.apply() that moves geometry vertically.
 
         Contact chain enforced (Z axis, bottom → top):
           sleeper bottom  = base_z
           sleeper top     = base_z + sleeper_height
           pad top         = sleeper_top + pad_thickness   ← rail foot rests here
-          rail centre     = pad_top + height/2 + lift
+          rail centre     = pad_top + height/2
           fastener base   = sleeper_top                   ← clip on sleeper surface
-          fastener top    = sleeper_top + fastener_depth  ← grows to bridge lift gap
-
-        When lift > 0 the fastener scale.z is adjusted so the clip still grips
-        the rail flange instead of leaving empty space.  The standard dimension
-        from the profile is the *initial* value only; correctness takes priority.
+          fastener top    = sleeper_top + fastener_depth
         """
         sleeper_top = self._sleeper_top_z(base_z)
 
@@ -277,7 +265,6 @@ class TrackSection:
                     sleeper_top
                     + rail_cfg.pad_thickness
                     + rail_cfg.height / 2
-                    + rail_cfg.lift
                 )
 
         # Index map (8 fasteners, 4 pairs of 2):

@@ -183,6 +183,14 @@ continuous:
 Omit the flag to restore the random mix at `DEFECT_PROBABILITY` (10 %). At 100 % the
 displacement spans run back-to-back with no healthy track between occurrences.
 
+### Defect rate
+
+`--defect-rate <0..1>` sets the fraction of sections that *start* a defect
+(**default 0.10**). This is the main dial for dataset composition — the balance of
+healthy to faulty examples. Note multi-section spans then occupy their follower
+sections too, so the share of *defective* sections lands several times higher
+(~30 % at the default rate).
+
 ### Reproducibility
 
 Defect placement is seeded: `--seed <int>`, **default 42**. The same seed and the same
@@ -238,7 +246,7 @@ If the Blender build lacks a video codec, the render falls back to a PNG frame s
 ## Tests
 
 ```bash
-pytest              # 361 tests, ~0.5 s
+pytest              # 380 tests, ~0.5 s
 ```
 
 Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub
