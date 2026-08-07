@@ -55,7 +55,11 @@ def summarise(settings) -> str:
     return "\n".join(
         [
             "Configuration summary:",
-            f"  track            {settings.track_length} m, "
+            f"  train            {settings.speed_kmh:g} km/h "
+            f"({settings.speed_ms:.1f} m/s), covering "
+            f"{settings.total_travel_distance_m:.0f} m",
+            f"  track            {settings.track_length_m:.0f} m"
+            f"{'' if settings.track_length_override_m is not None else ' (derived)'}, "
             f"{section_count(settings)} sections at "
             f"{settings.geometry.section_pitch:g} m spacing",
             f"  geometry         {settings.geometry.profile}, gauge "

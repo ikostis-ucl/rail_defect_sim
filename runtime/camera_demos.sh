@@ -8,7 +8,7 @@
 # Usage:
 #   BLENDER_BIN=/path/to/blender ./runtime/camera_demos.sh
 # Tunable via env vars, e.g.:
-#   BASE_SPEED=0.1 RES_X=1280 RES_Y=720 ./runtime/camera_demos.sh
+#   SPEED_KMH=10 RES_X=1280 RES_Y=720 ./runtime/camera_demos.sh
 # Extra args are forwarded to every run (and override config values), e.g.:
 #   ./runtime/camera_demos.sh --force-defect both_rails_vertical_bump
 set -euo pipefail
@@ -20,11 +20,10 @@ BLENDER_BIN="${BLENDER_BIN:-blender}"
 # Demo parameters — slow, smooth, near-constant glide.
 FPS="${FPS:-24}"
 DURATION="${DURATION:-10}"
-BASE_SPEED="${BASE_SPEED:-0.15}"      # Blender units/frame — very slow
+SPEED_KMH="${SPEED_KMH:-13}"          # km/h — walking-pace inspection
 ACCEL="${ACCEL:-0}"                   # seconds of ease-in; 0 = constant velocity
 RES_X="${RES_X:-960}"
 RES_Y="${RES_Y:-540}"
-TRACK_LENGTH="${TRACK_LENGTH:-1000}"  # long enough that the far end stays a vanishing point
 
 CAMERA_DIR="$PROJECT_ROOT/configs/camera"
 
@@ -36,7 +35,7 @@ if [ ${#configs[@]} -eq 0 ]; then
 fi
 
 echo "Rendering ${#configs[@]} camera demos: ${DURATION}s each, ${FPS}fps, "
-echo "speed=${BASE_SPEED} u/frame, accel=${ACCEL}s, ${RES_X}x${RES_Y}."
+echo "speed=${SPEED_KMH} km/h, accel=${ACCEL}s, ${RES_X}x${RES_Y}."
 
 for cfg in "${configs[@]}"; do
   name="$(basename "${cfg%.yml}")"
@@ -54,8 +53,7 @@ for cfg in "${configs[@]}"; do
     --resolution-x "$RES_X" \
     --resolution-y "$RES_Y" \
     --render-engine BLENDER_EEVEE \
-    --track-length "$TRACK_LENGTH" \
-    --base-speed-units-per-frame "$BASE_SPEED" \
+    --speed-kmh "$SPEED_KMH" \
     --camera-accel-seconds "$ACCEL" \
     --output-filename "demo_${name}.mp4" \
     "$@"

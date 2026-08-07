@@ -56,11 +56,23 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         help="Blender render engine override (e.g. BLENDER_EEVEE).",
     )
-    parser.add_argument("--track-length", type=int, help="Track length override.")
     parser.add_argument(
-        "--base-speed-units-per-frame",
+        "--speed-kmh",
         type=float,
-        help="Base camera speed override in Blender units per frame.",
+        help="Train speed in km/h. Frame rate does not affect it.",
+    )
+    parser.add_argument(
+        "--track-length-m",
+        type=float,
+        help=(
+            "Track length in metres. Omit to derive it from speed and duration, "
+            "which is normally what you want."
+        ),
+    )
+    parser.add_argument(
+        "--track-length-km",
+        type=float,
+        help="Track length in kilometres. Convenience form of --track-length-m.",
     )
     parser.add_argument(
         "--geometry-config",
@@ -164,6 +176,21 @@ def _extract_script_args(argv: list[str] | None = None) -> list[str]:
     return raw_args[1:]
 
 
+def _track_length_override(args) -> float | None:
+    """Resolve the track-length override from whichever unit was given.
+
+    ``None`` means the user did not ask for a specific length, so it stays
+    derived from speed and duration.
+    """
+    metres = getattr(args, "track_length_m", None)
+    kilometres = getattr(args, "track_length_km", None)
+    if metres is not None and kilometres is not None:
+        raise SystemExit("Give --track-length-m or --track-length-km, not both.")
+    if kilometres is not None:
+        return kilometres * 1000.0
+    return metres
+
+
 def _override(config, **candidates):
     """Return *config* with only the non-None *candidates* applied."""
     provided = {k: v for k, v in candidates.items() if v is not None}
@@ -219,8 +246,8 @@ def parse_pipeline_settings(argv: list[str] | None = None) -> PipelineSettings:
         camera=camera,
         geometry=geometry,
         output_filename=args.output_filename,
-        track_length=args.track_length,
-        base_speed_units_per_frame=args.base_speed_units_per_frame,
+        speed_kmh=getattr(args, "speed_kmh", None),
+        track_length_override_m=_track_length_override(args),
         geometry_config_path=getattr(args, "geometry_config", None),
         force_defect=getattr(args, "force_defect", None),
         seed=args.seed,

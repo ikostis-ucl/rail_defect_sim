@@ -22,7 +22,6 @@ $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     --resolution-x 640 `
     --resolution-y 360 `
     --render-engine BLENDER_EEVEE `
-    --track-length 5000 `
-    --base-speed-units-per-frame 0.6 `
+    --speed-kmh 10.8 `
     --output-filename smoke_test.mp4 `
     @args

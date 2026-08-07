@@ -300,6 +300,28 @@ The first render builds section prototypes (healthy + one per defect variant) an
 
 ## Configuration
 
+### Units
+
+A run is stated the way a person says it: **speed in km/h, duration in seconds,
+resolution in pixels, distances in metres.**
+
+```bash
+./runtime/draft_quick.sh --speed-kmh 100 --duration-seconds 20
+```
+
+- `speed_kmh` is the only place a speed is stored. `speed_ms` and
+  `metres_per_frame` are derived, never configured.
+- **Frame rate does not change how fast the train moves.** It used to: speed was
+  metres per *frame*, so raising fps from 12 to 25 for a smoother clip silently took
+  the train from 108 km/h to 225 km/h. fps now changes only how finely the motion is
+  sampled.
+- **Track length is derived** from speed x duration plus a 10 % margin
+  (`TRACK_LENGTH_MARGIN`), so the camera cannot be configured to run off the end of
+  the built track. Override with `--track-length-m` / `--track-length-km` when a
+  fixed-length track is wanted, typically for dataset generation.
+- Every user-facing quantity carries its unit in its name (`_m`, `_km`, `_kmh`,
+  `_deg`). Anything per-frame or in Blender units is internal and derived.
+
 Settings flow: CLI args (or `TSV_TWIN_*` env vars) → `config.py` → `PipelineSettings` dataclass. All settings have defaults; CLI args only override when explicitly provided. A config file (yaml/ini/key=value) can be passed with `--config <path>` (requires `configargparse`, which is installed).
 
 There are **two independent config channels** — don't confuse them:
@@ -326,7 +348,7 @@ If the Blender build lacks a video codec, the render falls back to a PNG frame s
 ## Tests
 
 ```bash
-pytest              # 444 tests, ~0.7 s
+pytest              # 461 tests, ~0.7 s
 ```
 
 Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub

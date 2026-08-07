@@ -82,7 +82,7 @@ class CameraAnimator:
         camera.location.y = 0
         camera.keyframe_insert(data_path="location", frame=start_frame, index=1)
 
-        camera.location.y = self.settings.total_travel_distance
+        camera.location.y = self.settings.total_travel_distance_m
         camera.keyframe_insert(data_path="location", frame=total_frames, index=1)
 
         action = camera.animation_data.action

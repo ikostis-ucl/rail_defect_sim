@@ -62,18 +62,18 @@ class TrackLongerThanTravel(IntervalConstraint):
     """Cross-config: reads camera motion and track length together."""
 
     NAME = "track_covers_travel"
-    FIELD = "track_length"
+    FIELD = "track_length_m"
     UNIT = "m"
-    READS = ("track_length", "base_speed_units_per_frame", "render.duration_seconds")
+    READS = ("track_length_override_m", "speed_kmh", "render.duration_seconds")
 
     def value(self, ctx):
-        return float(ctx.settings.track_length)
+        return float(ctx.settings.track_length_m)
 
     def interval(self, ctx):
-        return Interval(low=ctx.settings.total_travel_distance)
+        return Interval(low=ctx.settings.total_travel_distance_m)
 
     def apply(self, ctx, value):
-        return ctx.with_settings(track_length=int(value))
+        return ctx.with_settings(track_length_override_m=float(value))
 
 
 # ── ValidationContext ─────────────────────────────────────────────────────────
@@ -204,9 +204,9 @@ def test_repair_clamps_and_reports_the_change():
 
 
 def test_repair_leaves_untouched_settings_alone():
-    settings = PipelineSettings(camera=CameraConfig(lens_mm=24.0), track_length=500)
+    settings = PipelineSettings(camera=CameraConfig(lens_mm=24.0), track_length_override_m=500)
     report = Resolver([LensAtLeast35()]).resolve(settings)
-    assert report.settings.track_length == 500
+    assert report.settings.track_length_override_m == 500
     assert report.settings.seed == settings.seed
 
 
@@ -228,12 +228,12 @@ def test_cross_config_repair():
     """A rule reading camera motion adjusts track length to match."""
     settings = PipelineSettings(
         render=RenderConfig(fps=10, duration_seconds=10),   # 100 frames
-        base_speed_units_per_frame=2.5,                     # 250 m of travel
-        track_length=100,                                   # too short
+        speed_kmh=90.0,                                     # 250 m of travel
+        track_length_override_m=100,                        # too short
     )
     report = Resolver([TrackLongerThanTravel()]).resolve(settings)
     assert report.ok
-    assert report.settings.track_length == 250
+    assert report.settings.track_length_m == 250
 
 
 # ── Resolver: strict and warn ─────────────────────────────────────────────────
@@ -281,20 +281,20 @@ def test_conflicting_repairs_are_reported_not_spun_on():
 def test_resolver_terminates_on_conflict_rather_than_hanging():
     class Grow(IntervalConstraint):
         NAME = "grow"
-        FIELD = "track_length"
+        FIELD = "track_length_m"
 
         def value(self, ctx):
-            return float(ctx.settings.track_length)
+            return float(ctx.settings.track_length_m)
 
         def interval(self, ctx):
-            return Interval(low=ctx.settings.track_length + 1)
+            return Interval(low=ctx.settings.track_length_m + 1)
 
         def apply(self, ctx, value):
-            return ctx.with_settings(track_length=int(value))
+            return ctx.with_settings(track_length_override_m=float(value))
 
-    report = Resolver([Grow()], max_rounds=3).resolve(PipelineSettings(track_length=10))
+    report = Resolver([Grow()], max_rounds=3).resolve(PipelineSettings(track_length_override_m=10))
     assert report.exhausted_rounds
-    assert report.settings.track_length == 13   # advanced once per round, then gave up
+    assert report.settings.track_length_m == 13   # advanced once per round, then gave up
 
 
 # ── resolve_or_raise ──────────────────────────────────────────────────────────

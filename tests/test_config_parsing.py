@@ -86,15 +86,15 @@ def test_invalid_height_reference_rejected(capsys):
 
 def test_run_level_flags():
     s = parse(
-        "--track-length", "500",
-        "--base-speed-units-per-frame", "0.15",
+        "--track-length-m", "500",
+        "--speed-kmh", "36",
         "--output-filename", "clip.mp4",
         "--seed", "7",
         "--force-defect", "skewed_sleeper",
         "--geometry-config", "configs/geometry/wide_gauge.yml",
     )
-    assert s.track_length == 500
-    assert s.base_speed_units_per_frame == 0.15
+    assert s.track_length_m == 500
+    assert s.speed_kmh == 36
     assert s.output_filename == "clip.mp4"
     assert s.seed == 7
     assert s.force_defect == "skewed_sleeper"
@@ -108,8 +108,8 @@ def test_blender_argument_passthrough_is_stripped():
 
 
 def test_travel_distance_reflects_parsed_values():
-    s = parse("--fps", "10", "--duration-seconds", "10", "--base-speed-units-per-frame", "0.5")
-    assert s.total_travel_distance == pytest.approx(50.0)
+    s = parse("--fps", "10", "--duration-seconds", "10", "--speed-kmh", "36")
+    assert s.total_travel_distance_m == pytest.approx(100.0)
 
 
 # ── Geometry resolution ───────────────────────────────────────────────────────
