@@ -61,6 +61,13 @@ class RailwayVideoPipeline:
                 raise
 
     def _run(self) -> None:
+        # Clear anything an earlier run of this name left behind, however it
+        # died. A killed run leaves numbered PNG frames, and ffmpeg assembles
+        # by pattern — so leftovers from a longer previous run would be spliced
+        # into this one's video. Clearing at the start covers every way a run
+        # can end, including the ones no in-process handler can catch.
+        clear_partial_output(self.settings.output_dir)
+
         self.token.check()
         self.reporter.phase_start(Phase.SCENE)
         self.scene_setup.setup_metric_units()

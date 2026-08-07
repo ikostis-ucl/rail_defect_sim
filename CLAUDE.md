@@ -234,17 +234,26 @@ track and are `--verbose` only.
 geometry builds hundreds of cached prototypes before a frame renders, so a frame-only
 bar would sit at zero looking hung.
 
-**Cancellation** is a flag set from SIGINT/SIGTERM and checked at phase boundaries
-(`app/progress/cancel.py`). A signal can arrive anywhere, including inside a Blender call
-that must not be unwound halfway, so the run notices at a checkpoint it chooses. On
-cancel the run's output directory is cleared — a cancelled run has no usable output — and
-the process exits **130**. The section cache is deliberately *not* cleared: prototypes are
-written atomically, so whatever completed there is valid.
+**Cancelling a run means killing the process.** A render runs as
+`blender --background`, so whoever launched it — the UI, a shell, CI — stops it by
+killing it. That works during the render itself, which nothing in-process can interrupt:
+`bpy.ops.render.render(animation=True)` is a single blocking call.
 
-> **Known gap.** Cancellation does not yet interrupt the *render* phase, because
-> `bpy.ops.render.render(animation=True)` is a single blocking call. A cancel during
-> rendering takes effect only once the render finishes. Fixing it means rendering
-> frame by frame.
+Two things make killing safe, and they matter more than any graceful path:
+
+- **Cache writes are atomic.** Prototypes are written to a temporary name and renamed
+  into place, so a process dying mid-write leaves the cache consistent rather than
+  leaving a truncated `.blend` the manifest still believes in.
+- **A run clears its output directory before starting.** A killed run leaves numbered
+  PNG frames behind, and ffmpeg assembles by pattern — so without this, leftovers from a
+  longer previous run would be spliced onto the end of a later, shorter one. Clearing at
+  the start covers every way a run can end, including `SIGKILL` and power loss, which no
+  handler can catch.
+
+`app/progress/cancel.py` additionally offers a **best-effort graceful stop**: SIGINT and
+SIGTERM set a flag, checked at phase boundaries, which clears the output directory and
+exits **130**. That is a courtesy for a console user pressing Ctrl-C between phases, not
+the mechanism a UI should rely on.
 
 ## Defect system
 
@@ -403,7 +412,7 @@ If the Blender build lacks a video codec, the render falls back to a PNG frame s
 ## Tests
 
 ```bash
-pytest              # 498 tests, ~1 s
+pytest              # 499 tests, ~1 s
 ```
 
 Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub

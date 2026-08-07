@@ -201,3 +201,20 @@ def test_restoring_a_non_python_handler_does_not_explode():
     manager.__exit__(None, None, None)          # must not raise
     assert callable(signal.getsignal(signal.SIGINT)) or \
         signal.getsignal(signal.SIGINT) in (signal.SIG_DFL, signal.SIG_IGN)
+
+
+def test_clear_partial_output_leaves_no_frames_for_a_later_run(tmp_path):
+    """Why a run clears its output directory before starting.
+
+    ffmpeg assembles a PNG sequence by numbered pattern. A killed run leaves
+    frames behind, so without this a later, shorter run of the same name would
+    have the dead run's frames spliced onto the end of its video.
+    """
+    run = tmp_path / "run"
+    run.mkdir()
+    for i in range(1, 63):
+        (run / f"clip{i:04d}.png").write_text("x")
+
+    clear_partial_output(run)
+
+    assert not run.exists()
