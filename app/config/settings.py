@@ -10,6 +10,7 @@ without launching Blender.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +26,13 @@ from app.config.render import RenderConfig
 #: the clip ends exactly at the last section, which puts the end of the world in
 #: the final frames.
 TRACK_LENGTH_MARGIN = 0.10
+
+#: A preview is a deliberately cheap look at what a configuration produces —
+#: same track, same camera, same defects, just small and short. It answers "is
+#: this the shot I meant?" without paying for the real render.
+PREVIEW_HEIGHT = 320        # vertical pixels; width follows the real aspect ratio
+PREVIEW_DURATION_S = 3
+PREVIEW_FPS = 10
 
 
 def _default_output_filename() -> str:
@@ -124,6 +132,42 @@ class PipelineSettings:
         """Create the output directory, and return it. The only side effect here."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
         return self.output_dir
+
+    def preview(self) -> "PipelineSettings":
+        """A cheap, short version of this run, for looking before committing.
+
+        Everything that decides *what* is rendered — geometry, camera, speed,
+        seed, defect placement — is kept exactly, so the preview shows the same
+        track from the same viewpoint. Only the cost changes: fewer pixels,
+        fewer seconds, fewer frames.
+
+        The aspect ratio is preserved, because a preview whose framing differs
+        from the real render answers the wrong question. Dimensions are rounded
+        to even numbers, which h264 requires.
+
+        Never *increases* anything: previewing an already-tiny configuration
+        should not render more than the real thing.
+        """
+        render = self.render
+        height = min(PREVIEW_HEIGHT, render.resolution_y)
+        aspect = render.resolution_x / render.resolution_y
+        width = max(2, round(height * aspect / 2) * 2)
+        height = max(2, round(height / 2) * 2)
+
+        stem = Path(self.output_filename).stem
+        suffix = Path(self.output_filename).suffix or ".mp4"
+
+        return dataclasses.replace(
+            self,
+            render=dataclasses.replace(
+                render,
+                resolution_x=width,
+                resolution_y=height,
+                fps=min(PREVIEW_FPS, render.fps),
+                duration_seconds=min(PREVIEW_DURATION_S, render.duration_seconds),
+            ),
+            output_filename=f"{stem}_preview{suffix}",
+        )
 
     @property
     def speed_ms(self) -> float:

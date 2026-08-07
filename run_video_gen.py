@@ -48,7 +48,12 @@ def run(
 
 def main() -> None:
     """CLI entrypoint that always resolves settings from config.py."""
-    run(settings=parse_pipeline_settings())
+    import sys as _sys
+
+    settings = parse_pipeline_settings()
+    if "--preview" in _sys.argv:
+        settings = settings.preview()
+    run(settings=settings)
 
 
 if __name__ == "__main__":

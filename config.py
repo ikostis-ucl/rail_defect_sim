@@ -65,6 +65,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--preview",
+        action="store_true",
+        help=(
+            "Render a small, short preview instead: same scene, "
+            f"reduced resolution, duration and frame rate."
+        ),
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         default=None,

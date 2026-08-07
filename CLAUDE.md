@@ -207,6 +207,22 @@ Two rules of thumb the geometry module establishes:
 narrowing the rail feet each silently break a standard the config claims to
 follow, so it fails the run and says why.
 
+### Preview renders
+
+`--preview` renders the **same scene, made cheap**: 320 lines tall at the real aspect
+ratio, 3 seconds, 10 fps.
+
+```bash
+./runtime/final_fullhd.sh --preview     # 568x320, 10 fps, 3 s — ~685x cheaper
+```
+
+`PipelineSettings.preview()` derives it, and what it *keeps* is the point: geometry,
+camera, speed, seed and defect placement are untouched, so the preview shows the same
+track from the same viewpoint. Only cost changes. It never scales anything *up*, so
+previewing an already-small configuration is not more expensive than rendering it, and
+it is idempotent. Output goes to `<name>_preview.mp4`, so a preview never overwrites a
+real render.
+
 ## Progress and cancellation
 
 A run emits **events** (`app/progress/events.py`) once, and reporters render them for
@@ -412,7 +428,7 @@ If the Blender build lacks a video codec, the render falls back to a PNG frame s
 ## Tests
 
 ```bash
-pytest              # 499 tests, ~1 s
+pytest              # 515 tests, ~1 s
 ```
 
 Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub
