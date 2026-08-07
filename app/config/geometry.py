@@ -33,19 +33,16 @@ class RailConfig:
       pad_thickness — thickness of the elastomeric pad inserted between the
                       rail foot and the sleeper surface; raises the rail seat
                       and isolates vibration.
-      lift          — extra clearance above the nominal rail seat; used by
-                      defect simulation only (not a physical rail property).
-      angle         — rotation around the vertical (Z) axis in degrees;
-                      0 = rail aligned with track direction (normal operation);
-                      non-zero = rail skewed in the horizontal plane (defect).
+
+    Every field is a *healthy* physical dimension. Defects are not expressed
+    here: they deform the built mesh (see ``app/geometry/defects/``), so this
+    config always describes track as designed, never track as damaged.
     """
 
     head_width: float = 0.070     # rail crown width — visual width of the rail top
     foot_width: float = 0.140     # base flange width — determines sleeper overhang and fastener seats
     height: float = 0.159         # total rail height (foot bottom to head top)
     pad_thickness: float = 0.007  # elastomeric pad between rail foot and sleeper surface
-    lift: float = 0.0             # defect-use only: extra clearance above the rail seat
-    angle: float = 0.0            # defect-use only: horizontal skew in degrees
 
 
 @dataclass(frozen=True)
@@ -62,15 +59,13 @@ class TrackGeometryConfig:
     """
     Frozen dataclass holding every geometric parameter for one track section.
 
-    section_pitch (the centre-to-centre spacing between consecutive sleeper
-    positions) is a *derived* quantity:
+    Every dimension is stated directly in metres. section_pitch (the
+    centre-to-centre spacing between consecutive sleepers) is a plain distance
+    rather than a ratio, because that is how track standards express it.
 
-        section_pitch = sleeper_depth / sleeper_pitch_ratio
-
-    Changing sleeper_depth or sleeper_pitch_ratio automatically adjusts the
-    pitch — the two values cannot drift apart.
-
-    Each rail is configured independently via left_rail / right_rail.
+    Each rail is configured independently via left_rail / right_rail: a defect
+    is frequently present on one rail only, so the two must be describable
+    apart from each other.
 
     Use from_gauge(gauge_mm, profile) to build a physically coherent config
     from a single gauge value and a standard rail profile (UIC54, UIC60, 115RE).
@@ -104,22 +99,20 @@ class TrackGeometryConfig:
 
     sleeper_height: float = 0.200  # vertical sleeper dimension (Z axis)
 
-    # Fraction of the centre-to-centre pitch occupied by the sleeper body.
-    # section_pitch = sleeper_depth / sleeper_pitch_ratio
-    # Default: 0.200 / 0.320 = 0.625 m  (mid-range of 600–660 mm Camrail spec,
-    #   yielding 1 600 sleepers/km — within the 1 500–1 666 sleepers/km target)
-    sleeper_pitch_ratio: float = 0.320
+    # Centre-to-centre distance between consecutive sleepers, in metres.
+    # Default 0.625 m is mid-range of the 600–660 mm Camrail specification and
+    # yields 1 600 sleepers/km, inside the 1 500–1 666 sleepers/km target.
+    #
+    # Stated directly rather than as a ratio of sleeper_depth: a spacing in
+    # metres is what track standards specify and what a reader can sanity-check
+    # at a glance, whereas a plausible-looking ratio can hide an absurd spacing.
+    section_pitch: float = 0.625
 
     # ── Fasteners ─────────────────────────────────────────────────────────────
     screw_radius: float = 0.0065   # radius of the elastic clip cylinder (clip diameter / 2)
     screw_length: float = 0.035    # height of the clip above the sleeper surface
 
     # ── Derived ───────────────────────────────────────────────────────────────
-
-    @property
-    def section_pitch(self) -> float:
-        """Centre-to-centre distance between consecutive sleeper positions (m)."""
-        return self.sleeper_depth / self.sleeper_pitch_ratio
 
     @property
     def sleeper_top_z(self) -> float:
@@ -135,8 +128,8 @@ class TrackGeometryConfig:
         this value keeps its clearance even when the rails differ.
         """
         return self.sleeper_top_z + max(
-            self.left_rail.pad_thickness + self.left_rail.height + self.left_rail.lift,
-            self.right_rail.pad_thickness + self.right_rail.height + self.right_rail.lift,
+            self.left_rail.pad_thickness + self.left_rail.height,
+            self.right_rail.pad_thickness + self.right_rail.height,
         )
 
     @property
@@ -278,6 +271,7 @@ class TrackGeometryConfig:
             right_rail=new_rr,
             sleeper_depth=_check("sleeper_depth", self.sleeper_depth, p.sleeper_depth_mm),
             sleeper_height=_check("sleeper_height", self.sleeper_height, p.sleeper_height_mm),
+            section_pitch=_check("section_pitch", self.section_pitch, p.section_pitch_mm),
             screw_radius=_check("screw_radius", self.screw_radius, p.clip_diameter_mm / 2),
             screw_length=_check("screw_length", self.screw_length, p.clip_height_mm),
         )
@@ -299,9 +293,8 @@ class TrackGeometryConfig:
                     1435 for UIC standard gauge).
         profile   — name of a rail profile in the catalog (UIC54, UIC60, 115RE).
 
-        All dimensions are derived from the profile spec; the gauge controls
-        rail_spacing and — indirectly — sleeper_pitch_ratio so that
-        section_pitch targets the standard 625 mm centre-to-centre spacing.
+        All dimensions are taken from the profile spec, which is the standard
+        this track claims to follow; the gauge controls rail_spacing only.
         """
         from app.config.profiles import DEFAULT_PROFILE, PROFILES
         if profile is None:
@@ -325,7 +318,7 @@ class TrackGeometryConfig:
             right_rail=rail_cfg,
             sleeper_depth=p.sleeper_depth_mm / 1000,
             sleeper_height=p.sleeper_height_mm / 1000,
-            sleeper_pitch_ratio=p.sleeper_pitch_ratio,
+            section_pitch=p.section_pitch_mm / 1000,
             screw_radius=p.clip_diameter_mm / 2 / 1000,
             screw_length=p.clip_height_mm / 1000,
         )

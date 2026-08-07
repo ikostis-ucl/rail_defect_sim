@@ -50,6 +50,13 @@ class PipelineSettings:
     force_defect: str | None = None   # if set, every section gets this defect
     seed: int = 42                    # RNG seed for defect placement
 
+    # Fraction of sections that *start* a defect. The single most important dial
+    # for dataset generation: it sets the balance of healthy to faulty examples
+    # in the training data. Note multi-section defects then occupy their
+    # follower sections too, so the share of *defective* sections ends up
+    # several times this value.
+    defect_rate: float = 0.10
+
     # ── Derived ───────────────────────────────────────────────────────────────
 
     @property

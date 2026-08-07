@@ -72,9 +72,18 @@ class DefectSelector:
         return None
 
     @classmethod
-    def default(cls, seed: Optional[int] = None) -> "DefectSelector":
-        """Create a DefectSelector pre-populated with all known defect variants."""
-        selector = cls(seed=seed)
+    def default(
+        cls,
+        seed: Optional[int] = None,
+        *,
+        probability: float | None = None,
+    ) -> "DefectSelector":
+        """Create a DefectSelector pre-populated with all known defect variants.
+
+        *probability* is the share of sections that start a defect; it defaults
+        to ``DEFECT_PROBABILITY`` when not given.
+        """
+        selector = cls(seed=seed, probability=probability)
         for defect_class in ALL_DEFECTS:
             for span_group in defect_class.span_groups():
                 selector.register_span(span_group)

@@ -2,7 +2,7 @@
 # Source: UIC leaflet 860, Table 1.
 #
 # These values are the *reference* used by validate_against_profile("UIC60").
-# All linear dimensions in millimetres.  sleeper_pitch_ratio is dimensionless.
+# All linear dimensions in millimetres.
 
 name: UIC60
 standard: 60E1
@@ -13,10 +13,9 @@ height_mm: 172.0
 
 # Sleeper — B70 / B75 concrete monoblock (standard gauge, 1 435 mm)
 #   Along-track depth = 260 mm.
-#   section_pitch = 0.260 / 0.400 = 0.650 m
 sleeper_depth_mm: 260.0
 sleeper_height_mm: 220.0
-sleeper_pitch_ratio: 0.400     # 260 mm / 650 mm = 0.400
+section_pitch_mm: 650.0     # centre-to-centre sleeper spacing
 
 # Fasteners — Vossloh SKL-14 / Pandrol e-clip style
 clip_diameter_mm: 13.0

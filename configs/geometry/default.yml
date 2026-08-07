@@ -29,16 +29,12 @@ left_rail:
   foot_width: 0.140       # base flange width — drives fastener seat positions
   height: 0.159           # total rail height from foot bottom to head top
   pad_thickness: 0.007    # elastomeric pad between rail foot and sleeper surface
-  lift: 0.0               # defect-use only: extra vertical clearance above rail seat
-  angle: 0.0              # defect-use only: horizontal skew in degrees (0 = aligned)
 
 right_rail:
   head_width: 0.070
   foot_width: 0.140
   height: 0.159
   pad_thickness: 0.007
-  lift: 0.0
-  angle: 0.0
 
 # ── Sleeper ───────────────────────────────────────────────────────────────────
 
@@ -50,11 +46,8 @@ sleeper_depth: 0.200
 # Vertical dimension of the sleeper body (Z axis).
 sleeper_height: 0.200
 
-# Fraction of the centre-to-centre pitch occupied by the sleeper body.
-# section_pitch = sleeper_depth / sleeper_pitch_ratio
-# Default: 0.200 / 0.320 = 0.625 m  (mid-range of 600–660 mm Camrail standard,
-# yielding 1 600 sleepers/km — within the 1 500–1 666 sleepers/km target)
-sleeper_pitch_ratio: 0.320
+# Centre-to-centre sleeper spacing, in metres.
+section_pitch: 0.625
 
 # ── Fasteners ─────────────────────────────────────────────────────────────────
 

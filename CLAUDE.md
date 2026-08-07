@@ -69,7 +69,7 @@ Blender launches, so anything it reads must import without `bpy`. Two rules keep
 that true, both enforced by `tests/test_bpy_free_imports.py` (which blocks `bpy`
 outright in a subprocess — the `conftest.py` stub would mask the coupling):
 
-- **`app/config/` must never import `bpy`.**
+- **`app/config/` and `app/validation/` must never import `bpy`.**
 - **Defect *metadata* must never import `bpy`.** `app/geometry/__init__.py` exports
   its builders lazily (PEP 562) and the defect modules import `TrackSection` only
   under `TYPE_CHECKING`, so `ALL_DEFECTS` is readable outside Blender. Only
@@ -95,6 +95,13 @@ app/
     appearance.py           AppearanceConfig (per-surface colour/metallic/roughness)
     geometry.py             TrackGeometryConfig (+ RailConfig, derived quantities)
     profiles.py             RailProfileSpec catalog (YAML-overridable)
+  validation/             pre-render constraint checking, no bpy:
+    context.py              ValidationContext — every config a rule may read
+    derived.py              cross-config quantities (frame footprint, overlap, …)
+    constraint.py           Constraint ABC + Interval + IntervalConstraint
+    resolver.py             Resolver, Policy, ValidationReport, resolve_or_raise
+    registry.py             CONSTRAINT_TYPES — the rules in force
+    issue.py                Severity + ValidationIssue helpers
   core/pipeline.py        RailwayVideoPipeline — orchestrates everything
   geometry/
     track_section.py      TrackSection: builds one H-shaped section (rails + sleepers + fasteners)
@@ -122,12 +129,48 @@ configs/
   profiles/               rail profile specs (uic54, uic60, 115re) — auto-loaded at
                           import by app/config/profiles.py, overriding the built-in
                           dicts; no flag needed
+tools/
+  preflight.py            validate + summarise a config without launching Blender
 assets/
   track_section_cache/          healthy section prototypes (.blend files)
   track_section_cache/defective/  defective section prototypes (.blend files)
 ```
 
 `RailwayVideoPipeline.run()` is the single execution path: clean scene → world → render settings → build track → lighting → camera → render → finalize output.
+
+## Validation
+
+A run is checked **before Blender starts**, so an impossible or useless configuration
+costs milliseconds instead of a full section-cache build plus render.
+
+```bash
+python tools/preflight.py -- --camera-height 6 --geometry-config configs/geometry/wide_gauge.yml
+```
+
+This is ordinary Python — no `blender` needed. It prints what the configuration
+actually produces (frame footprint, frame overlap, longest defect, section count)
+and exits 0 if usable, 1 if not, so a runtime script can gate a render on it.
+`run_video_gen.run()` calls the same resolver as a safety net for direct
+`blender --background --python` invocations; pass `validate=False` to skip it.
+
+**How a rule is written.** Subclass `Constraint` (or `IntervalConstraint` when the
+rule is "this quantity must lie in this range") and add it to `CONSTRAINT_TYPES` in
+`app/validation/registry.py` — the same one-line pattern as `ALL_DEFECTS`. A rule
+reads whatever it needs off `ValidationContext` (every config in one object) and
+`app/validation/derived.py` (quantities that only exist *across* two configs, e.g.
+frame footprint needs camera + render). Expressing a rule as an interval is what
+makes automatic repair possible: the nearest legal value is just a clamp.
+
+**Policies.** `Policy.REPAIR` (default) adjusts the configuration to satisfy the
+rules and reports every change; `Policy.STRICT` refuses without adjusting;
+`Policy.WARN` reports and proceeds. Repair iterates to a fixpoint because one fix
+can break another rule; if rules conflict, the resolver stops after `max_rounds`
+and reports the conflict rather than spinning.
+
+**The registry is currently empty**, which makes the resolver a deliberate no-op —
+this is the foundation only. The rules themselves land as separate work: the
+existing geometry checks, sleeper spacing, the camera rail-top datum, camera field
+of view, defect observability, render budget.
 
 ## Defect system
 
@@ -182,6 +225,14 @@ continuous:
 
 Omit the flag to restore the random mix at `DEFECT_PROBABILITY` (10 %). At 100 % the
 displacement spans run back-to-back with no healthy track between occurrences.
+
+### Defect rate
+
+`--defect-rate <0..1>` sets the fraction of sections that *start* a defect
+(**default 0.10**). This is the main dial for dataset composition — the balance of
+healthy to faulty examples. Note multi-section spans then occupy their follower
+sections too, so the share of *defective* sections lands several times higher
+(~30 % at the default rate).
 
 ### Reproducibility
 
@@ -238,7 +289,7 @@ If the Blender build lacks a video codec, the render falls back to a PNG frame s
 ## Tests
 
 ```bash
-pytest              # 361 tests, ~0.5 s
+pytest              # 412 tests, ~0.6 s
 ```
 
 Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub

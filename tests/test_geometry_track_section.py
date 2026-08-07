@@ -91,9 +91,9 @@ def test_geometry_payload_contains_config_fields():
         assert f.name in payload
 
 
-def test_geometry_payload_no_derived_section_pitch():
+def test_geometry_payload_includes_section_pitch():
     payload = TrackSection().geometry_payload()
-    assert "section_pitch" not in payload
+    assert "section_pitch" in payload
 
 
 def test_geometry_payload_values_match_config():
@@ -108,8 +108,8 @@ def test_geometry_payload_rail_configs_are_nested_dicts():
     payload = TrackSection().geometry_payload()
     assert isinstance(payload["left_rail"], dict)
     assert isinstance(payload["right_rail"], dict)
-    assert "angle" in payload["left_rail"]
-    assert "angle" in payload["right_rail"]
+    assert "pad_thickness" in payload["left_rail"]
+    assert "pad_thickness" in payload["right_rail"]
 
 
 def test_geometry_payload_no_ballast_keys():
@@ -149,33 +149,11 @@ def test_rail_foot_bottom_equals_sleeper_top_plus_pad():
     assert rail_foot_bottom == pytest.approx(sleeper_top + pad)
 
 
-def test_rail_center_z_includes_lift():
-    """lift shifts the rail upward without changing sleeper or pad position."""
-    pad = 0.007
-    height = 0.159
-    lift = 0.05
-    rail_normal = RailConfig(pad_thickness=pad, height=height, lift=0.0)
-    rail_lifted = RailConfig(pad_thickness=pad, height=height, lift=lift)
-    ts = _section(sleeper_height=0.200)
-    diff = ts._rail_center_z(0.0, rail_lifted) - ts._rail_center_z(0.0, rail_normal)
-    assert diff == pytest.approx(lift)
-
-
-def test_fastener_depth_standard_when_no_lift():
-    """With lift=0, fastener uses screw_length unchanged."""
+def test_fastener_depth_is_the_standard_clip_length():
+    """The clip length exceeds the pad, so it is used unchanged."""
     ts = TrackSection()
     cfg = ts.config
     assert ts._fastener_depth(cfg.left_rail) == pytest.approx(cfg.screw_length)
-
-
-def test_fastener_depth_grows_with_lift():
-    """When lift exceeds screw_length - pad_thickness, fastener must grow."""
-    big_lift = 0.050
-    rail_cfg = RailConfig(pad_thickness=0.007, lift=big_lift)
-    ts = TrackSection()
-    depth = ts._fastener_depth(rail_cfg)
-    # depth must be at least pad_thickness + lift so clip reaches rail foot
-    assert depth >= rail_cfg.pad_thickness + rail_cfg.lift
 
 
 def test_rail_no_overlap_with_sleeper():
@@ -200,47 +178,6 @@ def test_sleeper_role_constant():
 
 def test_left_right_rail_roles_distinct():
     assert TrackSection.LEFT_RAIL_ROLE != TrackSection.RIGHT_RAIL_ROLE
-
-
-def test_rail_angle_zero_sets_no_rotation():
-    import bpy
-    ts = _section()
-    ts.section_parent = bpy.context.active_object
-    rail = bpy.context.active_object
-    rail.rotation_euler = [0.0, 0.0, 0.0]
-    ts._create_rail(
-        0.0, (0, 0, 0),
-        rail_cfg=RailConfig(angle=0.0),
-        role=TrackSection.LEFT_RAIL_ROLE,
-        collection=bpy.context.scene.collection,
-    )
-    assert rail.rotation_euler[2] == pytest.approx(0.0)
-
-
-def test_rail_angle_sets_z_rotation():
-    import bpy
-    angle_deg = 5.0
-    ts = _section()
-    ts.section_parent = bpy.context.active_object
-    rail = bpy.context.active_object
-    rail.rotation_euler = [0.0, 0.0, 0.0]
-    ts._create_rail(
-        0.0, (0, 0, 0),
-        rail_cfg=RailConfig(angle=angle_deg),
-        role=TrackSection.LEFT_RAIL_ROLE,
-        collection=bpy.context.scene.collection,
-    )
-    assert rail.rotation_euler[2] == pytest.approx(math.radians(angle_deg))
-
-
-def test_independent_left_right_rail_angles_in_config():
-    cfg = TrackGeometryConfig(
-        left_rail=RailConfig(angle=5.0),
-        right_rail=RailConfig(angle=-3.0),
-    )
-    ts = TrackSection(config=cfg)
-    assert ts.config.left_rail.angle == pytest.approx(5.0)
-    assert ts.config.right_rail.angle == pytest.approx(-3.0)
 
 
 def test_all_role_constants_are_strings():
@@ -284,3 +221,22 @@ def test_apply_materials_dispatches_by_role():
     sleeper_obj.data.materials.append.assert_called_with(sleeper_mat)
     fastener_obj.data.materials.append.assert_called_with(fastener_mat)
     parent_obj.data.materials.append.assert_not_called()
+
+
+def test_rails_are_configurable_independently():
+    """A defect often appears on one rail only, so the two must differ freely."""
+    cfg = TrackGeometryConfig(
+        left_rail=RailConfig(head_width=0.070, height=0.159),
+        right_rail=RailConfig(head_width=0.074, height=0.172),
+    )
+    ts = TrackSection(config=cfg)
+    assert ts.config.left_rail.head_width != ts.config.right_rail.head_width
+    assert ts.config.left_rail.height != ts.config.right_rail.height
+
+
+def test_rail_config_has_no_defect_fields():
+    """lift/angle are gone: defects deform the mesh, they are not config."""
+    import dataclasses
+    names = {f.name for f in dataclasses.fields(RailConfig)}
+    assert "lift" not in names
+    assert "angle" not in names
