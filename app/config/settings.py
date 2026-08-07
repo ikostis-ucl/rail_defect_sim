@@ -21,6 +21,12 @@ from app.config.geometry import TrackGeometryConfig
 from app.config.render import RenderConfig
 
 
+#: Extra track built beyond what the camera covers, as a fraction. Without it
+#: the clip ends exactly at the last section, which puts the end of the world in
+#: the final frames.
+TRACK_LENGTH_MARGIN = 0.10
+
+
 def _default_output_filename() -> str:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"rail_render_{timestamp}.mp4"
@@ -39,8 +45,23 @@ class PipelineSettings:
 
     # ── Run-level values ──────────────────────────────────────────────────────
     output_filename: str = field(default_factory=_default_output_filename)
-    track_length: int = 100000
-    base_speed_units_per_frame: float = 2.5
+
+    # Train speed in km/h — the unit a person actually thinks in, and the unit
+    # the config file and the UI present. Everything internal derives from it;
+    # nothing else stores a speed.
+    #
+    # This used to be metres per *frame*, which meant frame rate and physical
+    # speed were the same knob: raising fps from 12 to 25 for a smoother clip
+    # silently took the train from 108 km/h to 225 km/h. Frame rate now changes
+    # only how finely the motion is sampled.
+    speed_kmh: float = 80.0
+
+    # Explicit track length in metres. ``None`` means derive it from how far the
+    # camera actually travels, which is the normal case — a track shorter than
+    # the clip renders empty space off the end, and a track far longer is build
+    # time spent on geometry no frame ever sees. Set it only when a fixed-length
+    # track is wanted, typically for dataset generation.
+    track_length_override_m: float | None = None
 
     # Provenance only: which .yml `geometry` was loaded from, or None for
     # defaults. The geometry itself is resolved at parse time so that a complete
@@ -92,10 +113,34 @@ class PipelineSettings:
         return self.output_dir
 
     @property
-    def total_travel_distance(self) -> float:
-        """Metres the camera covers over the whole clip.
+    def speed_ms(self) -> float:
+        """Speed in metres per second — the machine's unit, not the user's."""
+        return self.speed_kmh / 3.6
 
-        Compared against ``track_length`` this says whether the camera runs off
-        the end of the built track.
+    @property
+    def metres_per_frame(self) -> float:
+        """Distance the camera advances between consecutive frames.
+
+        Derived, never configured. Frame rate divides the same physical speed
+        into more or fewer samples; it does not change how fast the train moves.
         """
-        return self.base_speed_units_per_frame * self.total_frames
+        fps = self.render.fps
+        return self.speed_ms / fps if fps > 0 else 0.0
+
+    @property
+    def total_travel_distance_m(self) -> float:
+        """Metres the camera covers over the whole clip."""
+        return self.speed_ms * self.render.duration_seconds
+
+    @property
+    def track_length_m(self) -> float:
+        """Metres of track to build.
+
+        Either the explicit override, or the distance travelled plus a margin so
+        the camera never reaches the final section. Deriving it is what makes
+        "the camera ran off the end of the track" impossible to configure rather
+        than a mistake something has to catch afterwards.
+        """
+        if self.track_length_override_m is not None:
+            return float(self.track_length_override_m)
+        return self.total_travel_distance_m * (1.0 + TRACK_LENGTH_MARGIN)

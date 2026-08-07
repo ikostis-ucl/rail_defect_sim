@@ -59,12 +59,9 @@ def test_aspect_ratio():
 
 # ── Run-level values ──────────────────────────────────────────────────────────
 
-def test_default_track_length():
-    assert PipelineSettings().track_length == 100_000
-
-
-def test_default_speed():
-    assert PipelineSettings().base_speed_units_per_frame == 2.5
+def test_default_speed_is_stated_in_kmh():
+    assert PipelineSettings().speed_kmh == 80.0
+    assert PipelineSettings().speed_ms == pytest.approx(22.2222, abs=1e-4)
 
 
 def test_default_seed_is_42():
@@ -72,12 +69,48 @@ def test_default_seed_is_42():
 
 
 def test_total_travel_distance():
-    """Distance covered over the clip — compared against track_length."""
+    """Distance covered over the clip, from speed and duration alone."""
     s = PipelineSettings(
-        render=RenderConfig(fps=10, duration_seconds=10),  # 100 frames
-        base_speed_units_per_frame=2.5,
+        render=RenderConfig(fps=10, duration_seconds=10),
+        speed_kmh=36.0,   # 10 m/s
     )
-    assert s.total_travel_distance == pytest.approx(250.0)
+    assert s.total_travel_distance_m == pytest.approx(100.0)
+
+
+def test_frame_rate_does_not_change_how_fast_the_train_moves():
+    """The bug this replaced: fps and speed used to be the same knob."""
+    slow = PipelineSettings(render=RenderConfig(fps=12, duration_seconds=10))
+    fast = PipelineSettings(render=RenderConfig(fps=60, duration_seconds=10))
+    assert slow.speed_ms == fast.speed_ms
+    assert slow.total_travel_distance_m == fast.total_travel_distance_m
+    # ...only the sampling changes
+    assert fast.metres_per_frame == pytest.approx(slow.metres_per_frame / 5)
+
+
+def test_metres_per_frame_is_derived_from_speed_and_fps():
+    s = PipelineSettings(render=RenderConfig(fps=10), speed_kmh=36.0)
+    assert s.metres_per_frame == pytest.approx(1.0)
+
+
+def test_track_length_is_derived_with_a_margin():
+    s = PipelineSettings(render=RenderConfig(fps=10, duration_seconds=10), speed_kmh=36.0)
+    assert s.total_travel_distance_m == pytest.approx(100.0)
+    assert s.track_length_m == pytest.approx(110.0)   # 10 % margin
+
+
+def test_derived_track_always_outlasts_the_camera():
+    """The camera running off the end becomes unconfigurable, not merely caught."""
+    for kmh in (10, 100, 300):
+        for seconds in (1, 20, 60):
+            s = PipelineSettings(
+                render=RenderConfig(duration_seconds=seconds), speed_kmh=kmh
+            )
+            assert s.track_length_m > s.total_travel_distance_m
+
+
+def test_explicit_track_length_overrides_the_derivation():
+    s = PipelineSettings(speed_kmh=100.0, track_length_override_m=50_000)
+    assert s.track_length_m == 50_000
 
 
 # ── Output naming ─────────────────────────────────────────────────────────────
@@ -99,7 +132,7 @@ def test_output_path_contains_run_name():
 def test_frozen_rejects_mutation():
     s = PipelineSettings()
     with pytest.raises(Exception):  # dataclasses.FrozenInstanceError
-        s.track_length = 99  # type: ignore[misc]
+        s.speed_kmh = 99  # type: ignore[misc]
 
 
 def test_domain_configs_are_frozen():

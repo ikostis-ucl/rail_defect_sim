@@ -32,7 +32,7 @@ class TrackBuilder:
         fastener_mat = self.materials.create_fastener_material()
         grass_mat = self.materials.create_grass_material()
 
-        track_length = self.settings.track_length
+        track_length = self.settings.track_length_m
         section_spacing = geometry.section_pitch
         section_z = geometry.base_elevation
 

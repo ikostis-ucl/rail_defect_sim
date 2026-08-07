@@ -11,6 +11,5 @@ $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     --resolution-x 1920 `
     --resolution-y 1080 `
     --render-engine BLENDER_EEVEE `
-    --track-length 100000 `
-    --base-speed-units-per-frame 2.5 `
+    --speed-kmh 270 `
     @args

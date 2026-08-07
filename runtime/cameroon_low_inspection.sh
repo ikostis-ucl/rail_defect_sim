@@ -16,7 +16,6 @@ exec "$BLENDER_BIN" \
   --resolution-x 960 \
   --resolution-y 540 \
   --render-engine BLENDER_EEVEE \
-  --track-length 1000 \
-  --base-speed-units-per-frame 0.15 \
+  --speed-kmh 5.4 \
   --camera-accel-seconds 0 \
   "$@"

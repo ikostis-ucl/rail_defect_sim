@@ -17,11 +17,10 @@ $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 # Demo parameters - slow, smooth, near-constant glide.
 $Fps         = if ($env:FPS)          { $env:FPS }          else { "24" }
 $Duration    = if ($env:DURATION)     { $env:DURATION }     else { "10" }
-$BaseSpeed   = if ($env:BASE_SPEED)   { $env:BASE_SPEED }   else { "0.15" }  # Blender units/frame - very slow
+$SpeedKmh   = if ($env:BASE_SPEED)   { $env:BASE_SPEED }   else { "0.15" }  # Blender units/frame - very slow
 $Accel       = if ($env:ACCEL)        { $env:ACCEL }        else { "0" }     # seconds of ease-in; 0 = constant velocity
 $ResX        = if ($env:RES_X)        { $env:RES_X }        else { "960" }
 $ResY        = if ($env:RES_Y)        { $env:RES_Y }        else { "540" }
-$TrackLength = if ($env:TRACK_LENGTH) { $env:TRACK_LENGTH } else { "1000" }  # long enough that the far end stays a vanishing point
 
 $CameraDir = "$ProjectRoot\configs\camera"
 
@@ -50,8 +49,7 @@ foreach ($cfg in $configs) {
         --resolution-x $ResX `
         --resolution-y $ResY `
         --render-engine BLENDER_EEVEE `
-        --track-length $TrackLength `
-        --base-speed-units-per-frame $BaseSpeed `
+        --speed-kmh $SpeedKmh `
         --camera-accel-seconds $Accel `
         --output-filename "demo_${name}.mp4" `
         @args

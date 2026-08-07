@@ -29,12 +29,12 @@ def section_count(settings: PipelineSettings) -> int:
     pitch = settings.geometry.section_pitch
     if pitch <= 0:
         return 0
-    return int(settings.track_length / pitch) + 1
+    return int(settings.track_length_m / pitch) + 1
 
 
 def track_build_length(settings: PipelineSettings) -> float:
     """Length of track actually built, in metres."""
-    return float(settings.track_length)
+    return float(settings.track_length_m)
 
 
 # ── Camera placement ──────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ def sections_per_frame(settings: PipelineSettings) -> float:
 
 def frame_advance(settings: PipelineSettings) -> float:
     """Metres the camera travels between consecutive frames."""
-    return settings.base_speed_units_per_frame
+    return settings.metres_per_frame
 
 
 def frame_overlap_ratio(settings: PipelineSettings) -> float:
@@ -106,7 +106,7 @@ def frame_overlap_ratio(settings: PipelineSettings) -> float:
 
 def camera_travel_distance(settings: PipelineSettings) -> float:
     """Total distance the camera covers over the whole clip, in metres."""
-    return settings.total_travel_distance
+    return settings.total_travel_distance_m
 
 
 # ── Defect extent ─────────────────────────────────────────────────────────────

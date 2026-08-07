@@ -19,8 +19,7 @@ $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     --duration-seconds 5 `
     --resolution-x 640 `
     --resolution-y 360 `
-    --track-length 500 `
-    --base-speed-units-per-frame 0.08 `
+    --speed-kmh 2.88 `
     --force-defect right_rail_lateral_displacement `
     --output-filename smoke_displacement.mp4 `
     @args
