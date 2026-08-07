@@ -9,6 +9,7 @@ Usage mirrors the render CLI exactly::
 
     python tools/preflight.py -- --camera-height 6 --geometry-config configs/geometry/wide_gauge.yml
     python tools/preflight.py -- --policy strict --fps 30
+    python tools/preflight.py --json -- --speed-kmh 120
 
 Exits 0 if the configuration is usable, 1 if it is not, so runtime scripts can
 gate a render on it.
@@ -16,6 +17,7 @@ gate a render on it.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -79,8 +81,27 @@ def summarise(settings) -> str:
     )
 
 
+def measurements(settings) -> dict:
+    """The derived numbers, as data — the same ones ``summarise`` prints."""
+    width, depth = frame_footprint(settings)
+    return {
+        "speed_kmh": settings.speed_kmh,
+        "travel_distance_m": settings.total_travel_distance_m,
+        "track_length_m": settings.track_length_m,
+        "section_count": section_count(settings),
+        "camera_height_above_rail_m": camera_height_above_rail(settings),
+        "frame_width_m": width,
+        "frame_depth_m": depth,
+        "frame_overlap_ratio": frame_overlap_ratio(settings),
+        "longest_defect_m": longest_defect_length(settings),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     raw = list(sys.argv[1:] if argv is None else argv)
+    # --json is ours, and is accepted on either side of the `--` separator.
+    as_json = "--json" in raw
+    raw = [a for a in raw if a != "--json"]
     if "--" in raw:
         raw = raw[raw.index("--") + 1 :]
     policy, args = _extract_policy(raw)
@@ -88,9 +109,14 @@ def main(argv: list[str] | None = None) -> int:
     settings = parse_pipeline_settings(["--", *args])
     report = Resolver(policy=policy).resolve(settings)
 
-    print(summarise(report.settings))
-    print()
-    print(report.render())
+    if as_json:
+        payload = report.as_dict()
+        payload["measurements"] = measurements(report.settings)
+        print(json.dumps(payload, indent=2))
+    else:
+        print(summarise(report.settings))
+        print()
+        print(report.render())
     return 0 if report.ok else 1
 
 

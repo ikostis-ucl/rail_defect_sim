@@ -50,6 +50,15 @@ class Repair:
     before: str
     after: str
 
+    def as_dict(self) -> dict:
+        """Plain data, ready to serialise."""
+        return {
+            "constraint": self.constraint,
+            "field": self.field,
+            "before": self.before,
+            "after": self.after,
+        }
+
     def describe(self) -> str:
         return f"{self.field}: {self.before} -> {self.after}  ({self.constraint})"
 
@@ -76,6 +85,20 @@ class ValidationReport:
     def ok(self) -> bool:
         """True when the run may proceed."""
         return not self.unresolved and not self.exhausted_rounds
+
+    def as_dict(self) -> dict:
+        """The whole outcome as plain data.
+
+        ``render()`` is the same information written for a person; this is the
+        same information written for a program.
+        """
+        return {
+            "ok": self.ok,
+            "exhausted_rounds": self.exhausted_rounds,
+            "issues": [i.as_dict() for i in self.issues],
+            "repairs": [r.as_dict() for r in self.repairs],
+            "unresolved": [i.as_dict() for i in self.unresolved],
+        }
 
     def render(self) -> str:
         """Human-readable summary, for logs and the pre-flight tool."""

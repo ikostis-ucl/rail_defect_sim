@@ -135,9 +135,19 @@ class IntervalConstraint(Constraint):
         interval = self.interval(ctx)
         if interval.contains(value):
             return []
+        # Every interval rule reports its numbers as data for free: the value,
+        # the bounds and the unit are already here, so a caller never has to
+        # read them back out of the sentence.
         return [
             ValidationIssue(
-                self.SEVERITY, self.FIELD, self.explain(ctx, value, interval)
+                self.SEVERITY,
+                self.FIELD,
+                self.explain(ctx, value, interval),
+                code=self.NAME,
+                value=value,
+                expected_min=interval.low,
+                expected_max=interval.high,
+                unit=self.UNIT,
             )
         ]
 

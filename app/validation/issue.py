@@ -32,16 +32,50 @@ class Severity(StrEnum):
 
 @dataclass(frozen=True)
 class ValidationIssue:
-    """One problem found in a configuration."""
+    """One problem found in a configuration.
+
+    ``message`` is for a person. Everything else is for a program, so that a
+    caller can act on *which* problem this is and *what* the numbers were
+    without reading English.
+
+    ``code`` is the stable identifier — the ``NAME`` of the constraint that
+    raised it. It plays the same role an exception type does: you match on
+    ``code == "rails_overlap"`` rather than searching the message for a phrase,
+    so rewording the message never breaks a caller. Codes are therefore a
+    promise: renaming one is a breaking change.
+
+    The numeric fields are optional because not every rule is about a quantity
+    in a range. When they are present, a caller can show the offending value
+    against its allowed bounds without parsing the sentence.
+    """
 
     severity: str   # Severity.ERROR | Severity.WARNING
     field: str      # which config field is implicated
     message: str    # human-readable description
 
+    code: str = ""                      # constraint NAME; stable across rewording
+    value: float | None = None          # the offending quantity
+    expected_min: float | None = None   # lower bound, if the rule has one
+    expected_max: float | None = None   # upper bound, if the rule has one
+    unit: str = ""                      # unit of value and the bounds
 
-def error(field: str, message: str) -> ValidationIssue:
-    return ValidationIssue(Severity.ERROR, field, message)
+    def as_dict(self) -> dict:
+        """Plain data, ready to serialise."""
+        return {
+            "code": self.code,
+            "severity": str(self.severity),
+            "field": self.field,
+            "message": self.message,
+            "value": self.value,
+            "expected_min": self.expected_min,
+            "expected_max": self.expected_max,
+            "unit": self.unit,
+        }
 
 
-def warning(field: str, message: str) -> ValidationIssue:
-    return ValidationIssue(Severity.WARNING, field, message)
+def error(field: str, message: str, code: str = "", **data) -> ValidationIssue:
+    return ValidationIssue(Severity.ERROR, field, message, code=code, **data)
+
+
+def warning(field: str, message: str, code: str = "", **data) -> ValidationIssue:
+    return ValidationIssue(Severity.WARNING, field, message, code=code, **data)
