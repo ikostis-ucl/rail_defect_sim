@@ -174,6 +174,22 @@ of view, defect observability, render budget.
 
 ## Defect system
 
+**Vocabulary and scope live in `TAXONOMY.md`** — read it before naming a new defect
+or arguing about what a term means. It fixes one English name per concept and records
+which defects are in scope and which are deliberately not. Points that bite most often:
+
+- **Gauge** is the distance between the **inner faces of the rail heads**, not
+  centre-to-centre. `TrackGeometryConfig.rail_spacing` is currently centre-to-centre
+  and so does not match the standard definition — reconciling it is tracked work.
+- The standard geometry parameters are **longitudinal level, cross level, alignment,
+  gauge, cant, twist**. Name defects after the parameter they deviate, whatever mesh
+  operation produces them.
+- Geometry defects are measured **against a chord**, over EN 13848 wavelength bands
+  (**D1** = 3–25 m, D2 = 25–70 m, D3 = 70–150 m). Our 5- and 7-section spans are
+  ~3.1 m and ~4.4 m — the very bottom of D1.
+- Foreign objects, signalling and safety equipment are **out of scope**; so are
+  purely internal defects, until a non-optical sensor model exists.
+
 Defects live in the `app/geometry/defects/` package, each as a subclass of `Defect` (`base.py`). Each declares a fixed set of `DefectVariant`s (pure data) and an `apply()` classmethod that mutates a `TrackSection`. Subclasses are collected in `registry.py` (`ALL_DEFECTS`).
 
 Defects are grouped by physical **component** first, then by **family** (mechanism) within a component:
