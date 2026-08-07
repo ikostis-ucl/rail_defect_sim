@@ -42,7 +42,6 @@ are what make #74 safe, not follow-up tidying.
 ```mermaid
 graph LR
   subgraph P0["Phase 0 · UI and generation settings"]
-    I75["#75 speed &amp; video units"]
     I29["#29 structured diagnostics"]
     I76["#76 machine-readable progress"]
     I26["#26 local web app"]
@@ -84,10 +83,8 @@ graph LR
     I9["#9 YOLO export"]
   end
 
-  I75 --> I26
   I29 --> I26
   I76 --> I26
-  I75 --> I31
   I29 --> I31
   VER --> I74
   I33 --> I31
@@ -116,9 +113,12 @@ graph LR
 Ahead of both teams, because both need to render test videos without recalling a
 `blender --background` invocation and picking from 24 shell scripts.
 
+**#75 (units) is done** — speed is stated in km/h, track length derives from speed and
+duration, and frame rate no longer changes how fast the train moves. That releases the
+form's field list for #26 and settles the quantities #29 has to serialise.
+
 | | |
 |---|---|
-| **#75** speed and video length in real units | the form's fields; also fixes fps silently changing train speed |
 | **#29** structured diagnostics | machine-readable validation, so a form can highlight a field |
 | **#76** machine-readable progress and cancellation | `app/progress/` drives a terminal tqdm bar a browser cannot consume |
 | **#26** local web app | thin Python backend, hand-written HTML/CSS/JS front end |
