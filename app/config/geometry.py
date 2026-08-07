@@ -12,7 +12,10 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # validation reads config, never the reverse at runtime
+    from app.validation.issue import ValidationIssue
 
 
 @dataclass(frozen=True)
@@ -43,15 +46,6 @@ class RailConfig:
     foot_width: float = 0.140     # base flange width — determines sleeper overhang and fastener seats
     height: float = 0.159         # total rail height (foot bottom to head top)
     pad_thickness: float = 0.007  # elastomeric pad between rail foot and sleeper surface
-
-
-@dataclass(frozen=True)
-class ValidationIssue:
-    """One entry returned by TrackGeometryConfig.validate()."""
-
-    severity: str   # "error" | "warning"
-    field: str      # which config field is implicated
-    message: str    # human-readable description
 
 
 @dataclass(frozen=True)
@@ -200,6 +194,8 @@ class TrackGeometryConfig:
         rail_spacing overlap invariant that validate() enforces).
         """
         from app.config.profiles import PROFILES
+        from app.validation.issue import ValidationIssue
+
         if profile_name is None:
             profile_name = self.profile
         if profile_name not in PROFILES:

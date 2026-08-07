@@ -25,7 +25,7 @@ from app.config.environment import (
     SunConfig,
     WorldConfig,
 )
-from app.config.geometry import RailConfig, TrackGeometryConfig, ValidationIssue
+from app.config.geometry import RailConfig, TrackGeometryConfig
 from app.config.render import RenderConfig
 from app.config.settings import PipelineSettings
 
@@ -42,5 +42,4 @@ __all__ = [
     "NoiseSurfaceAppearance",
     "TrackGeometryConfig",
     "RailConfig",
-    "ValidationIssue",
 ]

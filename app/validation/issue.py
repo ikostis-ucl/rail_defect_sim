@@ -1,18 +1,19 @@
 """What a constraint reports when it is unhappy.
 
-``ValidationIssue`` is deliberately the type ``TrackGeometryConfig.validate()``
-already returns, rather than a parallel vocabulary — the existing geometry
-checks migrate into constraints without changing what they emit.
+``ValidationIssue`` is defined here, in the layer that produces it. It used to
+live in ``app/config/geometry.py`` for the historical reason that
+``TrackGeometryConfig.validate()`` was the only thing that emitted one. Now that
+every constraint does, a validation type living inside a config module inverted
+the layering: validation reads config, never the other way round.
+
+``geometry.py`` still returns these from ``validate()``, but imports the type
+only under ``TYPE_CHECKING``, so the runtime dependency stays one-way.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
-
-# Re-exported: the canonical definition stays with the geometry config that has
-# always produced it. Constraints and the resolver import it from here so that
-# the whole validation layer has one obvious source.
-from app.config.geometry import ValidationIssue
 
 __all__ = ["Severity", "ValidationIssue", "error", "warning"]
 
@@ -27,6 +28,15 @@ class Severity(StrEnum):
 
     ERROR = "error"
     WARNING = "warning"
+
+
+@dataclass(frozen=True)
+class ValidationIssue:
+    """One problem found in a configuration."""
+
+    severity: str   # Severity.ERROR | Severity.WARNING
+    field: str      # which config field is implicated
+    message: str    # human-readable description
 
 
 def error(field: str, message: str) -> ValidationIssue:
