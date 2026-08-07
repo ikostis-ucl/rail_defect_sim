@@ -163,6 +163,22 @@ reads whatever it needs off `ValidationContext` (every config in one object) and
 frame footprint needs camera + render). Expressing a rule as an interval is what
 makes automatic repair possible: the nearest legal value is just a clamp.
 
+**Issues carry data, not just prose.** A `ValidationIssue` has a `message` for a
+person and, alongside it, a **`code`** plus the numbers that produced it. The code is
+the constraint's `NAME` — a stable identifier matched on like an exception type, so
+rewording a message never breaks a caller:
+
+```python
+if issue.code == "rails_do_not_overlap":   # not: if "overlap" in issue.message
+```
+
+`IntervalConstraint` fills `code`, `value`, `expected_min`, `expected_max` and `unit`
+automatically, so every interval rule reports its numbers for free. Codes are a
+promise: renaming one is a breaking change.
+
+`tools/preflight.py --json` prints the whole report plus the derived measurements as
+data, which is what a UI or a CI job consumes.
+
 **Policies.** `Policy.REPAIR` (default) adjusts the configuration to satisfy the
 rules and reports every change; `Policy.STRICT` refuses without adjusting;
 `Policy.WARN` reports and proceeds. Repair iterates to a fixpoint because one fix
@@ -348,7 +364,7 @@ If the Blender build lacks a video codec, the render falls back to a PNG frame s
 ## Tests
 
 ```bash
-pytest              # 461 tests, ~0.7 s
+pytest              # 477 tests, ~1 s
 ```
 
 Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub
