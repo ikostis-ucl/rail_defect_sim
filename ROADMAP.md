@@ -42,7 +42,6 @@ are what make #74 safe, not follow-up tidying.
 ```mermaid
 graph LR
   subgraph P0["Phase 0 · UI and generation settings"]
-    I29["#29 structured diagnostics"]
     I76["#76 machine-readable progress"]
     I26["#26 local web app"]
   end
@@ -83,9 +82,7 @@ graph LR
     I9["#9 YOLO export"]
   end
 
-  I29 --> I26
   I76 --> I26
-  I29 --> I31
   VER --> I74
   I33 --> I31
   I74 --> I78
@@ -113,13 +110,15 @@ graph LR
 Ahead of both teams, because both need to render test videos without recalling a
 `blender --background` invocation and picking from 24 shell scripts.
 
-**#75 (units) is done** — speed is stated in km/h, track length derives from speed and
-duration, and frame rate no longer changes how fast the train moves. That releases the
-form's field list for #26 and settles the quantities #29 has to serialise.
+**#75 (units) and #29 (structured diagnostics) are done.** Speed is stated in km/h and
+track length derives from it; validation issues carry a stable `code` plus their numbers,
+and `preflight --json` emits the whole report as data. Between them they settle the form's
+field list and its error display for #26, and fix the message shape #31 writes rules in.
+
+Remaining: **#76** then **#26**.
 
 | | |
 |---|---|
-| **#29** structured diagnostics | machine-readable validation, so a form can highlight a field |
 | **#76** machine-readable progress and cancellation | `app/progress/` drives a terminal tqdm bar a browser cannot consume |
 | **#26** local web app | thin Python backend, hand-written HTML/CSS/JS front end |
 
