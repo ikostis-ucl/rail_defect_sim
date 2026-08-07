@@ -207,6 +207,54 @@ Two rules of thumb the geometry module establishes:
 narrowing the rail feet each silently break a standard the config claims to
 follow, so it fails the run and says why.
 
+## Progress and cancellation
+
+A run emits **events** (`app/progress/events.py`) once, and reporters render them for
+whoever is watching. That split is why a headless VM and a UI can never disagree about
+a run — they read the same events.
+
+| Reporter | For |
+|---|---|
+| `ConsoleReporter` | a person, including over SSH: one line per phase, progress throttled to ~10 % steps |
+| `JsonReporter` | a program: one JSON object per line, written to a **file** |
+| `MultiReporter` | both at once |
+
+```bash
+./runtime/draft_quick.sh --progress-file /tmp/run.jsonl     # console + machine stream
+./runtime/draft_quick.sh --quiet --progress-file /tmp/run.jsonl
+./runtime/draft_quick.sh --verbose                          # per-asset cache detail
+```
+
+The machine stream goes to a file rather than stdout because **Blender writes copiously
+to stdout** and a consumer cannot filter a stream it does not own. Console output is
+deliberately quiet by default: per-asset cache lines are hundreds of lines on a large
+track and are `--verbose` only.
+
+**Phases, not just frames** — `scene`, `track`, `render`, `encode`. The first run of new
+geometry builds hundreds of cached prototypes before a frame renders, so a frame-only
+bar would sit at zero looking hung.
+
+**Cancelling a run means killing the process.** A render runs as
+`blender --background`, so whoever launched it — the UI, a shell, CI — stops it by
+killing it. That works during the render itself, which nothing in-process can interrupt:
+`bpy.ops.render.render(animation=True)` is a single blocking call.
+
+Two things make killing safe, and they matter more than any graceful path:
+
+- **Cache writes are atomic.** Prototypes are written to a temporary name and renamed
+  into place, so a process dying mid-write leaves the cache consistent rather than
+  leaving a truncated `.blend` the manifest still believes in.
+- **A run clears its output directory before starting.** A killed run leaves numbered
+  PNG frames behind, and ffmpeg assembles by pattern — so without this, leftovers from a
+  longer previous run would be spliced onto the end of a later, shorter one. Clearing at
+  the start covers every way a run can end, including `SIGKILL` and power loss, which no
+  handler can catch.
+
+`app/progress/cancel.py` additionally offers a **best-effort graceful stop**: SIGINT and
+SIGTERM set a flag, checked at phase boundaries, which clears the output directory and
+exits **130**. That is a courtesy for a console user pressing Ctrl-C between phases, not
+the mechanism a UI should rely on.
+
 ## Defect system
 
 **Vocabulary and scope live in `TAXONOMY.md`** — read it before naming a new defect
@@ -364,7 +412,7 @@ If the Blender build lacks a video codec, the render falls back to a PNG frame s
 ## Tests
 
 ```bash
-pytest              # 477 tests, ~1 s
+pytest              # 499 tests, ~1 s
 ```
 
 Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub

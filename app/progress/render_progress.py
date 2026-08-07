@@ -13,7 +13,18 @@ except ModuleNotFoundError:
 class BlenderRenderProgress(AbstractContextManager["BlenderRenderProgress"]):
     """Show a tqdm bar (or plain per-frame lines) for Blender animation renders."""
 
-    def __init__(self, scene, *, desc: str = "Rendering frames", leave: bool = False) -> None:
+    def __init__(
+        self,
+        scene,
+        *,
+        desc: str = "Rendering frames",
+        leave: bool = False,
+        reporter=None,
+    ) -> None:
+        # Optional reporter: the tqdm bar serves a terminal, the reporter
+        # serves every other audience. Both are fed from the same handler,
+        # so they cannot disagree about how far along the render is.
+        self.reporter = reporter
         self.scene = scene
         self.desc = desc
         self.leave = leave
@@ -79,6 +90,9 @@ class BlenderRenderProgress(AbstractContextManager["BlenderRenderProgress"]):
         if frame_number in self._completed_frames:
             return
         self._completed_frames.add(frame_number)
+        if self.reporter is not None:
+            from app.progress.events import Phase
+            self.reporter.progress(Phase.RENDER, len(self._completed_frames), self.total)
         if self._progress_bar is not None:
             self._progress_bar.update(1)
         elif self._progress_stream is not None:
@@ -112,10 +126,10 @@ class BlenderRenderProgress(AbstractContextManager["BlenderRenderProgress"]):
 
 
 def render_progress(
-    scene, *, desc: str = "Rendering frames", leave: bool = False
+    scene, *, desc: str = "Rendering frames", leave: bool = False, reporter=None
 ) -> BlenderRenderProgress:
     """Create a context manager that shows a progress bar for animation rendering."""
-    return BlenderRenderProgress(scene, desc=desc, leave=leave)
+    return BlenderRenderProgress(scene, desc=desc, leave=leave, reporter=reporter)
 
 
 def _open_progress_stream():

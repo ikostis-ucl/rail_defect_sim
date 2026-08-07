@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -9,6 +10,7 @@ from typing import Any, Iterable
 import bpy
 
 from app.geometry.cache.fingerprint import source_fingerprint
+from app.progress.verbosity import detail
 from app.geometry.cache.manifest import CacheManifest
 
 
@@ -92,13 +94,13 @@ class SectionCacheBase:
 
         existing = bpy.data.collections.get(collection_name)
         if existing is not None:
-            print(f"[{self.KIND} cache] hit (memory): {collection_name}")
+            detail(f"[{self.KIND} cache] hit (memory): {collection_name}")
             return existing
 
         if self.manifest.is_valid(collection_name, self.fingerprint) and cache_path.exists():
             loaded = self._load_collection(cache_path, collection_name)
             if loaded is not None and self._stamp_matches(loaded, cache_key):
-                print(f"[{self.KIND} cache] hit (disk): {cache_path.name}")
+                detail(f"[{self.KIND} cache] hit (disk): {cache_path.name}")
                 return loaded
             if loaded is not None:
                 # Manifest said valid but the .blend's embedded provenance
@@ -107,7 +109,7 @@ class SectionCacheBase:
                     f"[{self.KIND} cache] stale stamp on {cache_path.name}; rebuilding"
                 )
 
-        print(f"[{self.KIND} cache] miss: building {collection_name}")
+        detail(f"[{self.KIND} cache] miss: building {collection_name}")
         collection = build(collection_name)
         created_at = datetime.now().isoformat(timespec="seconds")
         self._stamp(collection, cache_key=cache_key, params=params, created_at=created_at)
@@ -121,7 +123,7 @@ class SectionCacheBase:
             params=params,
             created_at=created_at,
         )
-        print(f"[{self.KIND} cache] stored: {cache_path.name}")
+        detail(f"[{self.KIND} cache] stored: {cache_path.name}")
         return collection
 
     def _stamp_matches(self, collection, cache_key: str) -> bool:
@@ -170,8 +172,26 @@ class SectionCacheBase:
 
     @staticmethod
     def _write_collection(cache_path: Path, collection) -> None:
+        """Write a prototype, atomically.
+
+        Written to a temporary name in the same directory and then renamed into
+        place. ``os.replace`` is atomic within a filesystem, so a reader sees
+        either the previous file or the complete new one, never a partial write.
+
+        Without this, anything that stops the process mid-write — a cancelled
+        run, a crash, a full disk — leaves a truncated ``.blend`` that the
+        manifest still believes in, and the next run loads it as valid geometry.
+        """
         cache_path.parent.mkdir(parents=True, exist_ok=True)
-        bpy.data.libraries.write(str(cache_path), {collection})
+        temp_path = cache_path.with_name(f".{cache_path.name}.partial")
+        try:
+            bpy.data.libraries.write(str(temp_path), {collection})
+            os.replace(temp_path, cache_path)
+        except BaseException:
+            # BaseException, not Exception: a cancellation raised through here
+            # must not leave the temporary file behind either.
+            temp_path.unlink(missing_ok=True)
+            raise
 
     @staticmethod
     def _make_cache_key(payload: dict) -> str:

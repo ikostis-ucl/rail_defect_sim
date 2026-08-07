@@ -6,15 +6,21 @@ from app.geometry.defects import DefectSelector
 from app.geometry.track_section import TrackSection
 from app.geometry.utils import move_to_collection
 from app.materials import MaterialFactory
-from app.progress import progress_iter
+from app.progress import Phase, progress_iter
 
 
 class TrackBuilder:
     """Creates rails, sleepers, fasteners, and terrain."""
 
-    def __init__(self, settings: PipelineSettings, materials: MaterialFactory) -> None:
+    def __init__(
+        self,
+        settings: PipelineSettings,
+        materials: MaterialFactory,
+        reporter=None,
+    ) -> None:
         self.settings = settings
         self.materials = materials
+        self.reporter = reporter
         self.section_cache = TrackSectionCache()
         self.defective_cache = DefectiveSectionCache()
 
@@ -91,6 +97,8 @@ class TrackBuilder:
             total=num_sections,
             unit="section",
         ):
+            if self.reporter is not None:
+                self.reporter.progress(Phase.TRACK, i + 1, num_sections)
             y_pos = i * section_spacing
             if y_pos > track_length:
                 break
