@@ -1,0 +1,9 @@
+# Ownership of this branch.
+#
+# The `main` ruleset sets require_code_owner_review, which does nothing without
+# this file. With it, every pull request targeting a protected branch needs an
+# approving review from the owner below — so main is merged on his say-so only.
+#
+# Day-to-day work is reviewed on `develop`, where any collaborator may approve.
+
+* @ikostis-ucl
