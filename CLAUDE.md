@@ -185,8 +185,10 @@ which defects are in scope and which are deliberately not. Points that bite most
   gauge, cant, twist**. Name defects after the parameter they deviate, whatever mesh
   operation produces them.
 - Geometry defects are measured **against a chord**, over EN 13848 wavelength bands
-  (**D1** = 3–25 m, D2 = 25–70 m, D3 = 70–150 m). Our 5- and 7-section spans are
-  ~3.1 m and ~4.4 m — the very bottom of D1.
+  (**D1** = 3–25 m, D2 = 25–70 m, D3 = 70–150 m). **A span is not a wavelength**: the
+  rail-bend waveform is a *half* sine, so our 5- and 7-section spans occupy ~3.1 m and
+  ~4.4 m of track but have wavelengths of ~6.25 m and ~8.75 m. Span is also declared as
+  a section *count*, so the physical wavelength silently changes with `section_pitch`.
 - Foreign objects, signalling and safety equipment are **out of scope**; so are
   purely internal defects, until a non-optical sensor model exists.
 

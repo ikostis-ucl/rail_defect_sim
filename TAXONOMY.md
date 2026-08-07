@@ -84,8 +84,19 @@ versine over a fixed baseline. EN 13848-1 defines the wavelength bands:
 | **D2** | 25 m < λ ≤ 70 m | longer, slower deviations |
 | **D3** | 70 m < λ ≤ 150 m | high speed lines only |
 
-A defect spanning 5 sections at 0.625 m pitch is ~3.1 m — the very bottom of D1.
-Anything in D2 would need roughly 40 or more sections.
+**A span is not a wavelength.** The current rail-bend waveform is a *half* sine, so
+the sections a defect occupies cover half of one wavelength. A 5-section defect at
+0.625 m pitch occupies ~3.1 m of track and therefore has a wavelength of ~6.25 m;
+7 sections gives ~8.75 m. Both sit in the lower third of D1. The conversion factor
+between span and wavelength is a property of the waveform, so the two quantities must
+never be compared directly.
+
+Reaching D2 would need an extent of 12.5–35 m — 20 to 56 sections at this pitch.
+
+Note also that span is currently declared as a **section count**, which makes the
+physical wavelength depend on `section_pitch`: the same defect is 6.25 m under the
+default geometry and 1.9 m under `wide_gauge.yml`. Making wavelength the declared
+quantity is tracked work.
 
 **Longitudinal / lateral / vertical** always mean: along the track, across the
 track, and perpendicular to the plane of the rails, respectively.
