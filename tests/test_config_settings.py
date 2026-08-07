@@ -60,8 +60,8 @@ def test_aspect_ratio():
 # ── Run-level values ──────────────────────────────────────────────────────────
 
 def test_default_speed_is_stated_in_kmh():
-    assert PipelineSettings().speed_kmh == 100.0
-    assert PipelineSettings().speed_ms == pytest.approx(27.7778, abs=1e-4)
+    assert PipelineSettings().speed_kmh == 80.0
+    assert PipelineSettings().speed_ms == pytest.approx(22.2222, abs=1e-4)
 
 
 def test_default_seed_is_42():

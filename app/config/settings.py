@@ -54,7 +54,7 @@ class PipelineSettings:
     # speed were the same knob: raising fps from 12 to 25 for a smoother clip
     # silently took the train from 108 km/h to 225 km/h. Frame rate now changes
     # only how finely the motion is sampled.
-    speed_kmh: float = 100.0
+    speed_kmh: float = 80.0
 
     # Explicit track length in metres. ``None`` means derive it from how far the
     # camera actually travels, which is the normal case — a track shorter than
