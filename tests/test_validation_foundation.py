@@ -171,8 +171,11 @@ def test_interval_constraint_reports_value_and_range():
 
 # ── Resolver: empty registry ──────────────────────────────────────────────────
 
-def test_shipped_registry_is_empty_for_now():
-    assert all_constraints() == []
+def test_shipped_registry_carries_the_geometry_rules():
+    """Was 'empty for now' until the geometry checks were migrated into it."""
+    names = {c.NAME for c in all_constraints()}
+    assert "rails_do_not_overlap" in names
+    assert "sleeper_height_positive" in names
 
 
 def test_empty_constraint_set_is_a_no_op():

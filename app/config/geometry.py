@@ -151,51 +151,23 @@ class TrackGeometryConfig:
         Severity "error" means the geometry is geometrically impossible;
         severity "warning" means the combination is unusual but renderable.
         Never raises — callers decide what to do with the issues.
+
+        The rules themselves live in ``app/validation/constraints/geometry.py``
+        so that they also run in the resolver, which is what actually gates a
+        render. This method is the standalone view of them: handy when only a
+        geometry config is in hand, with no camera or render settings around it.
+
+        Imported inside the method because the validation layer reads this
+        module — the dependency only runs one way at import time.
         """
+        from app.config.settings import PipelineSettings
+        from app.validation.constraints.geometry import GEOMETRY_CONSTRAINTS
+        from app.validation.context import ValidationContext
+
+        ctx = ValidationContext.from_settings(PipelineSettings(geometry=self))
         issues: list[ValidationIssue] = []
-        lr, rr = self.left_rail, self.right_rail
-
-        # ── Errors (impossible geometry) ──────────────────────────────────────
-        if lr.height <= 0 or rr.height <= 0:
-            issues.append(ValidationIssue(
-                "error", "rail.height", "Rail height must be positive."))
-
-        if self.sleeper_height <= 0:
-            issues.append(ValidationIssue(
-                "error", "sleeper_height", "Sleeper height must be positive."))
-
-        if self.rail_spacing <= lr.foot_width + rr.foot_width:
-            issues.append(ValidationIssue(
-                "error", "rail_spacing",
-                f"Rail spacing ({self.rail_spacing:.3f} m) must exceed combined foot widths "
-                f"({lr.foot_width + rr.foot_width:.3f} m) — rails would overlap."))
-
-        if self.screw_radius * 2 > min(lr.foot_width, rr.foot_width):
-            issues.append(ValidationIssue(
-                "error", "screw_radius",
-                "Fastener diameter exceeds rail foot width — clips will not fit under the rail."))
-
-        if self.screw_length >= self.sleeper_height:
-            issues.append(ValidationIssue(
-                "error", "screw_length",
-                "Fastener length equals or exceeds sleeper height — clip would punch through sleeper."))
-
-        # ── Warnings (unusual but renderable) ─────────────────────────────────
-        if lr.pad_thickness >= lr.height * 0.5 or rr.pad_thickness >= rr.height * 0.5:
-            issues.append(ValidationIssue(
-                "warning", "rail.pad_thickness",
-                "Rail pad thickness is unusually large (≥ 50 % of rail height)."))
-
-        if self.screw_radius * 2 > min(lr.foot_width, rr.foot_width) * 0.4:
-            issues.append(ValidationIssue(
-                "warning", "screw_radius",
-                "Fastener diameter exceeds 40 % of rail foot width — clips are unusually large."))
-
-        if self.sleeper_height > self.rail_spacing * 0.3:
-            issues.append(ValidationIssue(
-                "warning", "sleeper_height",
-                "Sleeper height exceeds 30 % of gauge — unusually tall relative to track width."))
-
+        for constraint_type in GEOMETRY_CONSTRAINTS:
+            issues.extend(constraint_type().check(ctx))
         return issues
 
     # ── Profile validation ────────────────────────────────────────────────────

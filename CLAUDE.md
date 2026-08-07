@@ -102,6 +102,8 @@ app/
     resolver.py             Resolver, Policy, ValidationReport, resolve_or_raise
     registry.py             CONSTRAINT_TYPES — the rules in force
     issue.py                Severity + ValidationIssue helpers
+    constraints/            the rules themselves, one module per domain:
+      geometry.py             impossible dimensions (migrated from validate())
   core/pipeline.py        RailwayVideoPipeline — orchestrates everything
   geometry/
     track_section.py      TrackSection: builds one H-shaped section (rails + sleepers + fasteners)
@@ -167,10 +169,27 @@ rules and reports every change; `Policy.STRICT` refuses without adjusting;
 can break another rule; if rules conflict, the resolver stops after `max_rounds`
 and reports the conflict rather than spinning.
 
-**The registry is currently empty**, which makes the resolver a deliberate no-op —
-this is the foundation only. The rules themselves land as separate work: the
-existing geometry checks, sleeper spacing, the camera rail-top datum, camera field
-of view, defect observability, render budget.
+**Rules in force.** `constraints/geometry.py` holds the dimension checks that used
+to sit unused in `TrackGeometryConfig.validate()` — positive rail and sleeper
+heights, rails clearing both feet, fasteners that fit under the rail and inside the
+sleeper, plus three "unusual but renderable" warnings. `validate()` now delegates
+to them, so the standalone geometry view and the resolver cannot disagree. Still to
+come: sleeper spacing, the camera rail-top datum, camera field of view, defect
+observability, render budget.
+
+Two rules of thumb the geometry module establishes:
+
+- **Warnings never define `repair()`.** The resolver repairs anything repairable
+  regardless of severity, so a repairable warning would let REPAIR quietly rewrite
+  a configuration that was merely unusual.
+- **Open bounds do not clamp.** "Height must be positive" has no nearest valid
+  value — clamping gives an infinitesimal rail. Those repair to the dimension the
+  *profile standard* specifies. Closed bounds (a clip radius with a largest
+  acceptable value) clamp as normal.
+
+`RailsDoNotOverlap` is deliberately **not** repairable: widening the gauge or
+narrowing the rail feet each silently break a standard the config claims to
+follow, so it fails the run and says why.
 
 ## Defect system
 
@@ -307,7 +326,7 @@ If the Blender build lacks a video codec, the render falls back to a PNG frame s
 ## Tests
 
 ```bash
-pytest              # 412 tests, ~0.6 s
+pytest              # 444 tests, ~0.7 s
 ```
 
 Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub
