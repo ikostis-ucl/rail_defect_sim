@@ -76,6 +76,11 @@ graph LR
     I9["#9 YOLO export"]
   end
 
+  subgraph UI["UI track · parallel from Wave 1"]
+    I76["#76 machine-readable progress"]
+    I26["#26 local web app"]
+  end
+
   I34 --> I74
   I36 --> I74
   I37 --> I74
@@ -97,6 +102,9 @@ graph LR
   I5 --> I7
   I7 --> I8
   I8 --> I9
+  I75 --> I26
+  I29 --> I26
+  I76 --> I26
 ```
 
 ## The waves
@@ -119,6 +127,8 @@ Verification: **#34** alignment, **#35** gauge, **#36** longitudinal level,
 **#37** cross level, **#45** displaced sleeper, **#46** fastening.
 
 New defects: **#42** broken rail, **#43** missing sleeper, **#44** complete sleeper failure.
+
+UI track starts here: **#76** machine-readable progress, then **#26** the web app itself.
 
 **#35 before #33** — establish what gauge defects currently do before changing what gauge
 means.
@@ -167,8 +177,27 @@ Three streams that barely share files:
 | **Defect geometry** | `app/geometry/defects/` | verify → #74 → #38 → #42-#44 |
 | **Config and validation** | `app/config/`, `app/validation/` | #75, #29 → #33 → #31 → #22 |
 | **Subsystems** | `track_section.py`, `app/materials/`, `app/camera/` | #49 / #70 / #71 / #72 |
+| **UI** | `ui/` (new), `app/progress/` | #76 → #26 |
 
-The annotation chain is a fourth stream, gated only on #74.
+The annotation chain is a fifth stream, gated only on #74.
+
+### The UI track
+
+**#26** is a local web app — a thin Python backend plus a hand-written HTML/CSS/JS front
+end — and it is **high priority for an internal reason**: the developers building Groups
+A-E need a fast way to configure and launch test renders, which today means recalling a
+`blender --background --python` invocation and picking from 24 shell scripts.
+
+It starts once Wave 0 lands and then runs beside everything else. Its prerequisites are
+**#75** (the form's fields *are* resolution, fps, duration and speed), **#29** (machine-
+readable diagnostics, so the form can highlight a bad field rather than echo a sentence),
+and **#76** (progress a browser can consume — `app/progress/` currently drives a terminal
+tqdm bar, and a running render cannot be cancelled).
+
+It shares almost no files with the other tracks, and because `app/config/` and
+`app/validation/` are `bpy`-free the backend never imports Blender — it only invokes it as
+a subprocess. **This track can be worked by someone with no Blender installation**, which
+makes it the most cleanly separable work in the project.
 
 **Critical path:** verify → #74 → #6 → #5 → #7 → #8 → #9. Seven serial steps, and the
 route to a trainable dataset. Everything else has slack — if output matters sooner, staff
@@ -177,8 +206,8 @@ this chain first.
 ## Not scheduled
 
 Umbrella tasks (#4, #14, #32, #41, #48, #57, #61) span several waves and carry no
-milestone; their subtasks do. **#23** solver, **#24** backend review and **#26** UI are
-backlog — deliberately unscheduled rather than forgotten.
+milestone; their subtasks do. **#23** solver and **#24** backend review are backlog —
+deliberately unscheduled rather than forgotten.
 
 ## Keeping this honest
 
