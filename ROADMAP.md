@@ -42,7 +42,6 @@ are what make #74 safe, not follow-up tidying.
 ```mermaid
 graph LR
   subgraph P0["Phase 0 · UI and generation settings"]
-    I76["#76 machine-readable progress"]
     I26["#26 local web app"]
   end
 
@@ -82,7 +81,6 @@ graph LR
     I9["#9 YOLO export"]
   end
 
-  I76 --> I26
   VER --> I74
   I33 --> I31
   I74 --> I78
@@ -110,16 +108,16 @@ graph LR
 Ahead of both teams, because both need to render test videos without recalling a
 `blender --background` invocation and picking from 24 shell scripts.
 
-**#75 (units) and #29 (structured diagnostics) are done.** Speed is stated in km/h and
-track length derives from it; validation issues carry a stable `code` plus their numbers,
-and `preflight --json` emits the whole report as data. Between them they settle the form's
-field list and its error display for #26, and fix the message shape #31 writes rules in.
+**#75, #29 and #76 are done.** Speed is stated in km/h and track length derives from it;
+validation issues carry a stable `code` plus their numbers, with `preflight --json`; and a
+run emits phase events to a console account and a JSON stream, with the launcher killing
+the process to cancel. Between them they settle the form's fields, its error display and
+its progress feed.
 
-Remaining: **#76** then **#26**.
+**Remaining: #26**, the web app itself — every prerequisite is in.
 
 | | |
 |---|---|
-| **#76** machine-readable progress and cancellation | `app/progress/` drives a terminal tqdm bar a browser cannot consume |
 | **#26** local web app | thin Python backend, hand-written HTML/CSS/JS front end |
 
 Nothing here touches either team's files.
