@@ -187,8 +187,9 @@ This is the **critical path to a trainable dataset**. Everything else has slack.
 ## Not scheduled
 
 Umbrella tasks (#4, #14, #32, #41, #48, #57, #61) span phases and carry no milestone; their
-subtasks do. **#23** solver and **#24** backend review are backlog — deliberately unscheduled
-rather than forgotten.
+subtasks do. **#23** solver, **#24** backend review and **#83** runtime-script rework are
+backlog — deliberately unscheduled rather than forgotten. #83 in particular waits on #26:
+reworking the scripts before the CLI and the UI have settled means doing it twice.
 
 ## Keeping this honest
 
