@@ -182,6 +182,22 @@ backlog — deliberately unscheduled rather than forgotten.
 
 ## Keeping this honest
 
-Update it when an ordering assumption changes, not when an issue closes — GitHub already
-tracks completion. The graph is worth changing only if a *dependency* turns out to be
-wrong, which is the interesting kind of surprise.
+**This file is updated whenever issues change — opened, closed, or edited — in the same
+pass as the change itself.** Not afterwards, and not only when an ordering assumption
+moves.
+
+- **Opened** — place it in a wave, give it the matching milestone, and add it to the graph
+  if anything depends on it or it depends on anything.
+- **Closed** — take it out of the graph and its wave, then check what it was blocking:
+  a closed dependency usually releases something.
+- **Edited** — if scope or dependencies changed, wave placement and graph edges change too.
+- **Consolidated or superseded** — no dangling references to issue numbers that no longer
+  mean anything.
+
+The "Not scheduled" list above and the GitHub milestones are part of this: all three have
+to agree, and they have drifted apart before.
+
+The reason for the strictness is that a stale dependency graph is worse than no graph. The
+point of this file is to say what would be *wasted* by starting something too early, and a
+reader who cannot trust it either ignores it or is misled by it. Both outcomes are worse
+than the maintenance cost.
