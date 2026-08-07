@@ -8,7 +8,16 @@ from app.camera import CameraAnimator
 from app.config import PipelineSettings
 from app.geometry import TrackBuilder
 from app.materials import MaterialFactory
-from app.progress import progress_iter, render_progress
+from app.progress import (
+    Cancelled,
+    CancellationToken,
+    Phase,
+    Reporter,
+    cancel_on_signal,
+    clear_partial_output,
+    progress_iter,
+    render_progress,
+)
 from app.render import RenderSetup
 from app.scene import SceneSetup
 
@@ -16,35 +25,78 @@ from app.scene import SceneSetup
 class RailwayVideoPipeline:
     """Coordinates all generation services into one execution flow."""
 
-    def __init__(self, settings: PipelineSettings) -> None:
+    def __init__(
+        self,
+        settings: PipelineSettings,
+        reporter: Reporter | None = None,
+        token: CancellationToken | None = None,
+    ) -> None:
         self.settings = settings
+        self.reporter = reporter or Reporter()
+        self.token = token or CancellationToken()
         self.geometry = settings.geometry
         self.scene_setup = SceneSetup(settings.environment)
         self.render_setup = RenderSetup(settings)
         self.material_factory = MaterialFactory(settings.appearance)
-        self.track_builder = TrackBuilder(settings, self.material_factory)
+        self.track_builder = TrackBuilder(
+            settings, self.material_factory, reporter=self.reporter
+        )
         self.camera_animator = CameraAnimator(settings)
 
     def run(self) -> None:
+        """Build and render, reporting progress and honouring cancellation.
+
+        Cancellation is checked between phases rather than polled inside them:
+        a phase is a unit of work that is cheaper to repeat than to unwind.
+        """
+        with cancel_on_signal(self.token):
+            try:
+                self._run()
+            except Cancelled:
+                removed = clear_partial_output(self.settings.output_dir)
+                self.reporter.cancelled(
+                    f"Cancelled; removed {len(removed)} partial file(s).",
+                    removed=len(removed),
+                )
+                raise
+
+    def _run(self) -> None:
+        self.token.check()
+        self.reporter.phase_start(Phase.SCENE)
         self.scene_setup.setup_metric_units()
         self.scene_setup.cleanup_scene()
         self.scene_setup.setup_world()
 
         self.render_setup.apply()
+        self.reporter.phase_end(Phase.SCENE)
+
+        self.token.check()
+        self.reporter.phase_start(Phase.TRACK)
         self.track_builder.build(self.geometry)
+        self.reporter.phase_end(Phase.TRACK)
 
+        self.token.check()
         self.scene_setup.create_lighting()
-
         camera = self.camera_animator.setup_camera(self.geometry)
         self.camera_animator.animate(camera)
-
         self.render_setup.apply_eevee_enhancements()
 
+        self.token.check()
         scene = bpy.context.scene
+        total_frames = self.settings.render.total_frames
+        self.reporter.phase_start(Phase.RENDER, total=total_frames)
         print(f"Setup complete. Starting render to: {scene.render.filepath}")
-        with render_progress(scene, desc="Rendering frames..."):
+        with render_progress(scene, desc="Rendering frames...", reporter=self.reporter):
             bpy.ops.render.render(animation=True)
+        self.reporter.phase_end(Phase.RENDER)
+
+        self.token.check()
+        self.reporter.phase_start(Phase.ENCODE)
         self._finalize_output()
+        self.reporter.phase_end(Phase.ENCODE)
+        self.reporter.done(
+            f"Wrote {self.settings.output_path}", output=self.settings.output_path
+        )
 
     def _finalize_output(self) -> None:
         if not self.render_setup.is_png_fallback:

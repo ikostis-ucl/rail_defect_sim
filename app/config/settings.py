@@ -68,6 +68,19 @@ class PipelineSettings:
     # run can be validated before Blender is launched.
     geometry_config_path: str | None = None
 
+    # Where to write machine-readable progress, one JSON object per line. None
+    # means console only. A file rather than stdout because Blender writes
+    # copiously to stdout and a consumer cannot filter a stream it does not own.
+    progress_file: str | None = None
+
+    # Suppress the human progress account. Only sensible when something else is
+    # consuming progress_file; a headless run normally still wants a log.
+    quiet: bool = False
+
+    # Print the per-asset cache detail. Off by default: it is a few hundred
+    # lines on a large track and useful only when debugging the cache.
+    verbose: bool = False
+
     force_defect: str | None = None   # if set, every section gets this defect
     seed: int = 42                    # RNG seed for defect placement
 

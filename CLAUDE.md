@@ -207,6 +207,45 @@ Two rules of thumb the geometry module establishes:
 narrowing the rail feet each silently break a standard the config claims to
 follow, so it fails the run and says why.
 
+## Progress and cancellation
+
+A run emits **events** (`app/progress/events.py`) once, and reporters render them for
+whoever is watching. That split is why a headless VM and a UI can never disagree about
+a run — they read the same events.
+
+| Reporter | For |
+|---|---|
+| `ConsoleReporter` | a person, including over SSH: one line per phase, progress throttled to ~10 % steps |
+| `JsonReporter` | a program: one JSON object per line, written to a **file** |
+| `MultiReporter` | both at once |
+
+```bash
+./runtime/draft_quick.sh --progress-file /tmp/run.jsonl     # console + machine stream
+./runtime/draft_quick.sh --quiet --progress-file /tmp/run.jsonl
+./runtime/draft_quick.sh --verbose                          # per-asset cache detail
+```
+
+The machine stream goes to a file rather than stdout because **Blender writes copiously
+to stdout** and a consumer cannot filter a stream it does not own. Console output is
+deliberately quiet by default: per-asset cache lines are hundreds of lines on a large
+track and are `--verbose` only.
+
+**Phases, not just frames** — `scene`, `track`, `render`, `encode`. The first run of new
+geometry builds hundreds of cached prototypes before a frame renders, so a frame-only
+bar would sit at zero looking hung.
+
+**Cancellation** is a flag set from SIGINT/SIGTERM and checked at phase boundaries
+(`app/progress/cancel.py`). A signal can arrive anywhere, including inside a Blender call
+that must not be unwound halfway, so the run notices at a checkpoint it chooses. On
+cancel the run's output directory is cleared — a cancelled run has no usable output — and
+the process exits **130**. The section cache is deliberately *not* cleared: prototypes are
+written atomically, so whatever completed there is valid.
+
+> **Known gap.** Cancellation does not yet interrupt the *render* phase, because
+> `bpy.ops.render.render(animation=True)` is a single blocking call. A cancel during
+> rendering takes effect only once the render finishes. Fixing it means rendering
+> frame by frame.
+
 ## Defect system
 
 **Vocabulary and scope live in `TAXONOMY.md`** — read it before naming a new defect
@@ -364,7 +403,7 @@ If the Blender build lacks a video codec, the render falls back to a PNG frame s
 ## Tests
 
 ```bash
-pytest              # 477 tests, ~1 s
+pytest              # 498 tests, ~1 s
 ```
 
 Tests run in **plain Python, not Blender**: `tests/conftest.py` installs a `MagicMock` stub

@@ -57,6 +57,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Blender render engine override (e.g. BLENDER_EEVEE).",
     )
     parser.add_argument(
+        "--progress-file",
+        type=str,
+        help=(
+            "Write machine-readable progress as JSON lines to this file. "
+            "Console output continues unless --quiet."
+        ),
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        default=None,
+        help="Print per-asset cache detail.",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        default=None,
+        help="Suppress the human progress account.",
+    )
+    parser.add_argument(
         "--speed-kmh",
         type=float,
         help="Train speed in km/h. Frame rate does not affect it.",
@@ -247,6 +267,9 @@ def parse_pipeline_settings(argv: list[str] | None = None) -> PipelineSettings:
         geometry=geometry,
         output_filename=args.output_filename,
         speed_kmh=getattr(args, "speed_kmh", None),
+        progress_file=getattr(args, "progress_file", None),
+        quiet=getattr(args, "quiet", None),
+        verbose=getattr(args, "verbose", None),
         track_length_override_m=_track_length_override(args),
         geometry_config_path=getattr(args, "geometry_config", None),
         force_defect=getattr(args, "force_defect", None),

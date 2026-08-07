@@ -10,6 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.config import PipelineSettings
 from app.core import RailwayVideoPipeline
+from app.progress import Cancelled, build_reporter, set_verbose
 from app.validation import resolve_or_raise
 from config import parse_pipeline_settings
 
@@ -33,8 +34,16 @@ def run(
     if validate:
         settings = resolve_or_raise(settings)
 
-    pipeline = RailwayVideoPipeline(settings)
-    pipeline.run()
+    set_verbose(settings.verbose)
+    reporter = build_reporter(settings.progress_file, quiet=settings.quiet)
+    try:
+        RailwayVideoPipeline(settings, reporter=reporter).run()
+    except Cancelled:
+        # Not an error: the user asked for this. A distinct exit status lets a
+        # caller tell "stopped on request" from "went wrong".
+        raise SystemExit(130)
+    finally:
+        reporter.close()
 
 
 def main() -> None:
