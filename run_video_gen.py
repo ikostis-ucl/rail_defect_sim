@@ -10,15 +10,28 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.config import PipelineSettings
 from app.core import RailwayVideoPipeline
+from app.validation import resolve_or_raise
 from config import parse_pipeline_settings
 
 
 def run(
     settings: PipelineSettings | None = None,
+    *,
+    validate: bool = True,
 ) -> None:
-    """Canonical application entrypoint for Blender and programmatic use."""
+    """Canonical application entrypoint for Blender and programmatic use.
+
+    Settings are validated before the pipeline is built, so an impossible or
+    useless configuration is caught before any geometry is generated. The same
+    resolver runs in ``tools/preflight.py``, which gates a render without paying
+    for Blender startup at all; this call is the safety net for direct
+    ``blender --background --python`` invocations.
+    """
     if settings is None:
         settings = PipelineSettings()
+
+    if validate:
+        settings = resolve_or_raise(settings)
 
     pipeline = RailwayVideoPipeline(settings)
     pipeline.run()

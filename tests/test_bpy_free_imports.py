@@ -63,6 +63,54 @@ def test_cli_parser_imports_without_bpy():
     assert "ok" in result.stdout
 
 
+def test_validation_layer_imports_without_bpy():
+    """The whole point of the validation layer: it runs before Blender exists."""
+    result = _run_without_bpy(
+        """
+        from app.config import PipelineSettings
+        from app.validation import Resolver, resolve_or_raise
+        report = Resolver().resolve(PipelineSettings())
+        assert report.ok, report.render()
+        print("ok")
+        """
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ok" in result.stdout
+
+
+def test_derived_quantities_compute_without_bpy():
+    """Constraints read these, so they must be reachable outside Blender too."""
+    result = _run_without_bpy(
+        """
+        from app.config import PipelineSettings
+        from app.validation.derived import frame_footprint, longest_defect_length
+        settings = PipelineSettings()
+        assert frame_footprint(settings)[0] > 0
+        assert longest_defect_length(settings) > 0
+        print("ok")
+        """
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ok" in result.stdout
+
+
+def test_preflight_tool_runs_without_bpy():
+    """tools/preflight.py is the standalone gate — Blender must not be needed."""
+    result = _run_without_bpy(
+        """
+        import runpy, sys
+        sys.argv = ["preflight.py", "--", "--fps", "24"]
+        try:
+            runpy.run_path("tools/preflight.py", run_name="__main__")
+        except SystemExit as exit_code:
+            assert exit_code.code == 0, exit_code.code
+        print("ok")
+        """
+    )
+    assert result.returncode == 0, result.stderr
+    assert "ok" in result.stdout
+
+
 def test_defect_registry_imports_without_bpy():
     """Defect *metadata* must be readable outside Blender, unlike apply()."""
     result = _run_without_bpy(
