@@ -2,73 +2,81 @@
 
 What order the open work should be done in, and what can run at the same time.
 
-This is an **ordering** document, not a schedule — there are no dates. It exists because
-the issue tracker records *what* to do but not *what would be wasted by doing it too
-early*. Milestones named after the waves below mirror this on GitHub.
+This is an **ordering** document, not a schedule — there are no dates. It exists because the
+issue tracker records *what* to do but not *what would be wasted by doing it too early*.
+Milestones on GitHub mirror the phases below.
+
+## The plan
+
+Two teams working in parallel:
+
+- **Textures team** — real photographs to Blender materials, then the defects that are made
+  of texture.
+- **Geometry defects team** — defects made of shape and position.
+
+For that to work with minimal collision, two things happen first:
+
+1. **Phase 0 — UI and generation settings.** Both teams need to render their own test videos.
+2. **Phase 1 — Shared infrastructure.** Everything either team would otherwise change
+   underneath the other.
+
+Then the two run side by side, and the annotation chain runs beside both.
 
 ## What actually forces an order
 
 Topic similarity is not dependency. Three things genuinely cause rework:
 
-1. **Shared contracts.** `DefectVariant`, `ValidationIssue`, `PipelineSettings`. Anything
-   built on one of these before it changes shape gets rewritten.
-2. **Shared files.** Two pieces of work editing `defects/base.py` collide however
-   unrelated their subjects are.
-3. **Semantics about to change.** Writing a rule against a quantity whose definition is
-   already scheduled to move.
+1. **Shared contracts.** `DefectVariant`, `ValidationIssue`, `PipelineSettings`, the `Defect`
+   base class. Anything built on one before it settles gets rewritten.
+2. **Shared files.** Two people editing `defects/base.py` collide however unrelated their
+   subjects are.
+3. **Semantics about to change.** Writing a rule against a quantity already scheduled to move.
 
-One consequence is worth stating plainly, because it inverts the obvious order:
-**the verification work comes before the refactors.** #74 claims to be a pure refactor
-that leaves existing defects rendering identically. That claim is only checkable if the
-tests proving current behaviour already exist — so #34-#37, #45 and #46 are the net that
-makes #74 safe, not follow-up tidying.
+One consequence inverts the obvious order: **verification comes before refactoring.** #74
+claims to be a pure refactor leaving existing defects rendering identically. That claim is
+only checkable if the tests proving current behaviour already exist — so #34-#37, #45 and #46
+are what make #74 safe, not follow-up tidying.
 
 ## Dependency graph
 
 ```mermaid
 graph LR
-  subgraph W0["Wave 0 · contracts"]
+  subgraph P0["Phase 0 · UI and generation settings"]
     I75["#75 speed &amp; video units"]
     I29["#29 structured diagnostics"]
+    I76["#76 machine-readable progress"]
+    I26["#26 local web app"]
   end
 
-  subgraph W1["Wave 1 · regression net"]
-    I34["#34 verify alignment"]
-    I35["#35 verify gauge"]
-    I36["#36 verify long. level"]
-    I37["#37 verify cross level"]
-    I45["#45 verify displaced sleeper"]
-    I46["#46 verify fastening"]
-    I42["#42 broken rail"]
-    I43["#43 missing sleeper"]
-    I44["#44 sleeper failure"]
-  end
-
-  subgraph W2["Wave 2 · structural refactors"]
+  subgraph P1["Phase 1 · shared infrastructure"]
+    VER["#34-#37 #45 #46<br>verification net"]
     I74["#74 wavelength"]
     I33["#33 gauge measurement"]
-  end
-
-  subgraph W3["Wave 3 · rules &amp; geometry"]
-    I31["#31 constraint rules"]
-    I38["#38 twist"]
-    I22["#22 policy plumbing"]
-    I58["#58 railhead wear"]
-    I12["#12 defect vs frame"]
-  end
-
-  subgraph W4["Wave 4 · subsystems"]
-    I49["#49 ballast body"]
-    GC["#50-#56 ballast defects"]
-    I70["#70 texture system"]
-    GE["#62-#69 surface defects"]
+    I77["#77 cache knows appearance"]
+    I78["#78 defect appearance channel"]
+    I81["#81 auto-discover registry"]
     I71["#71 line-scan camera"]
-    I60["#60 corrugation"]
+    I31["#31 constraint rules"]
+  end
+
+  subgraph P2T["Phase 2 · textures team"]
+    I79["#79 PBR material pipeline"]
+    I80["#80 texture extraction"]
+    GE["#62-#69 surface defects"]
+    I55["#55 ballast fouling"]
+  end
+
+  subgraph P2G["Phase 2 · geometry defects team"]
+    NEWD["#42-#44 #38 #47<br>rail &amp; sleeper defects"]
+    I49["#49 ballast body"]
+    GC["#50-#54 #56<br>ballast defects"]
+    I58["#58 railhead wear"]
     I72["#72 curved track"]
     I40["#40 cant"]
+    I60["#60 corrugation"]
   end
 
-  subgraph W5["Wave 5 · annotation output"]
+  subgraph P3["Phase 3 · annotation output"]
     I6["#6 AABB extents"]
     I5["#5 annotation index"]
     I7["#7 annotations.json"]
@@ -76,157 +84,129 @@ graph LR
     I9["#9 YOLO export"]
   end
 
-  subgraph UI["UI track · parallel from Wave 1"]
-    I76["#76 machine-readable progress"]
-    I26["#26 local web app"]
-  end
-
-  I34 --> I74
-  I36 --> I74
-  I37 --> I74
-  I45 --> I74
-  I35 --> I33
-  I74 --> I38
-  I74 --> I6
-  I74 --> I12
-  I29 --> I31
+  I75 --> I26
+  I29 --> I26
+  I76 --> I26
   I75 --> I31
+  I29 --> I31
+  VER --> I74
   I33 --> I31
+  I74 --> I78
+  I77 --> I78
+  I74 --> NEWD
+  I78 --> I79
+  I79 --> GE
+  I80 --> GE
+  I71 --> GE
+  I71 --> I60
   I33 --> I58
   I49 --> GC
-  I70 --> GE
-  I71 --> I60
-  I71 -.->|makes them<br>resolvable| GE
   I72 --> I40
+  I74 --> I6
   I6 --> I5
   I5 --> I7
   I7 --> I8
   I8 --> I9
-  I75 --> I26
-  I29 --> I26
-  I76 --> I26
+  I49 -.->|cross-team| I55
+  I79 -.->|cross-team| I55
 ```
 
-## The waves
+## Phase 0 — UI and generation settings
 
-### Wave 0 — Contracts
-Small, root-level, and read by everything downstream. Do them first and alone.
+Ahead of both teams, because both need to render test videos without recalling a
+`blender --background` invocation and picking from 24 shell scripts.
 
-| | Why first |
+| | |
 |---|---|
-| **#75** speed and video units | touches `PipelineSettings`, `RenderConfig`, `config.py` and every runtime script |
-| **#29** structured diagnostics | changes `ValidationIssue`; every rule written afterwards uses the new shape |
+| **#75** speed and video length in real units | the form's fields; also fixes fps silently changing train speed |
+| **#29** structured diagnostics | machine-readable validation, so a form can highlight a field |
+| **#76** machine-readable progress and cancellation | `app/progress/` drives a terminal tqdm bar a browser cannot consume |
+| **#26** local web app | thin Python backend, hand-written HTML/CSS/JS front end |
 
-They touch different files, so they can run concurrently with each other.
+Nothing here touches either team's files.
 
-### Wave 1 — Regression net
-The safety net for Wave 2, plus the defects that need no new machinery. Each item owns a
-different module and its own test file, so this wave parallelises almost perfectly.
+## Phase 1 — Shared infrastructure
 
-Verification: **#34** alignment, **#35** gauge, **#36** longitudinal level,
-**#37** cross level, **#45** displaced sleeper, **#46** fastening.
+Everything both teams build on. Each item changes a contract or a file the two teams would
+otherwise edit from opposite sides.
 
-New defects: **#42** broken rail, **#43** missing sleeper, **#44** complete sleeper failure.
+**The regression net** — #34, #35, #36, #37, #45, #46. Proves what the existing defects do,
+which is what makes the refactors below safe.
 
-UI track starts here: **#76** machine-readable progress, then **#26** the web app itself.
+**Contract changes** — must be settled before anyone builds on them:
 
-**#35 before #33** — establish what gauge defects currently do before changing what gauge
-means.
-
-### Wave 2 — Structural refactors
-Each touches a shared contract, so each wants the tree to itself. They are independent of
-one another.
-
-| | Touches |
+| | Why shared |
 |---|---|
-| **#74** wavelength as a first-class parameter | `DefectVariant`, `defects/base.py`, `_bend_mesh`, defective cache |
-| **#33** gauge to inner-face measurement | `TrackGeometryConfig`, validation |
+| **#74** wavelength as a first-class parameter | changes `DefectVariant` and `defects/base.py`; both teams declare variants |
+| **#78** appearance channel in the `Defect` contract | changes `defects/base.py`; the textures team needs it to exist, the geometry team subclasses around it |
+| **#77** section cache accounts for appearance | moves the boundary between `track_section.py` and `app/materials/` — the exact seam both teams would edit |
+| **#33** gauge to inner-face measurement | config semantics read by both |
 
-### Wave 3 — Rules and geometry defects
-Everything here needs a Wave 0 or Wave 2 contract to be final first.
+**Friction reducers and shared capabilities** — #81 auto-discover registry (removes the one
+file every new defect touches), #71 line-scan camera (makes fine defects resolvable for both
+#60 and Group E), #31 constraint rules, #22 policy, #12 and #13 camera decisions.
 
-**#31** constraint rules · **#38** twist · **#22** policy plumbing · **#58** railhead wear ·
-**#12** defect-versus-frame decision · **#13** frame overlap · **#47** bent sleeper
+## Phase 2 — the two teams
 
-### Wave 4 — New subsystems
-Four independent capabilities, each unlocking its own defect group. Mutually parallel.
+### Textures team
 
-| Capability | Unlocks |
-|---|---|
-| **#49** ballast body | #50-#56 |
-| **#70** texture system | #62-#69, and #55 |
-| **#71** line-scan camera | #60, and makes #62-#69 resolvable targets at all |
-| **#72** curved track | #40 cant |
+Owns `app/materials/`, `app/config/appearance.py`, and the surface-defect packages.
 
-Also here: **#59** plastic flow, **#73** rail inclination.
+**#79** PBR material pipeline → **#80** texture extraction → **#62-#69** surface defects,
+plus **#55** ballast fouling.
 
-### Wave 5 — Annotation output
-A chain, and the **critical path** of the whole project: #6 → #5 → #7 → #8 → #9/#10,
-plus **#11** dataset render mode.
+Note **#80 is not a blocker for #62-#69**. Modelling a textural defect needs the material
+pipeline and the appearance channel, not the extraction library. Keeping extraction off that
+path means the defect work is not hostage to the ML-heavy piece.
 
-Largely independent of defect modelling, with one coupling: **#6 and #74 both touch the
-defective cache**, so #6 waits on #74. That single edge is the main link between the two
-halves of the project.
+### Geometry defects team
 
-## Parallel tracks
+Owns the geometric defect packages, `track_section.py` and `app/config/geometry.py`.
 
-Three streams that barely share files:
+**#42-#44, #38, #47** rail and sleeper defects → **#49** ballast body → **#50-#54, #56**
+ballast defects; alongside **#58** railhead wear, **#59**, **#60**, and **#72** curved track →
+**#40** cant, plus **#73** rail inclination.
 
-| Track | Owns | Sequence |
-|---|---|---|
-| **Defect geometry** | `app/geometry/defects/` | verify → #74 → #38 → #42-#44 |
-| **Config and validation** | `app/config/`, `app/validation/` | #75, #29 → #33 → #31 → #22 |
-| **Subsystems** | `track_section.py`, `app/materials/`, `app/camera/` | #49 / #70 / #71 / #72 |
-| **UI** | `ui/` (new), `app/progress/` | #76 → #26 |
+### Where the two touch
 
-The annotation chain is a fifth stream, gated only on #74.
+Deliberately almost nowhere. The remaining contact points:
 
-### The UI track
+- **`registry.py`** — both add entries. That is what #81 removes.
+- **#55 ballast fouling** — the one genuinely cross-team item: it needs the geometry team's
+  ballast body (#49) *and* the textures team's material pipeline (#79). Schedule it late and
+  give it an owner explicitly.
+- **`defects/base.py`** — frozen in Phase 1 precisely so neither team has to reopen it.
 
-**#26** is a local web app — a thin Python backend plus a hand-written HTML/CSS/JS front
-end — and it is **high priority for an internal reason**: the developers building Groups
-A-E need a fast way to configure and launch test renders, which today means recalling a
-`blender --background --python` invocation and picking from 24 shell scripts.
+## Phase 3 — Annotation output
 
-It starts once Wave 0 lands and then runs beside everything else. Its prerequisites are
-**#75** (the form's fields *are* resolution, fps, duration and speed), **#29** (machine-
-readable diagnostics, so the form can highlight a bad field rather than echo a sentence),
-and **#76** (progress a browser can consume — `app/progress/` currently drives a terminal
-tqdm bar, and a running render cannot be cancelled).
+#6 → #5 → #7 → #8 → #9/#10, plus #11. Independent of the team split and gated only on #74,
+because #6 and #74 both touch the defective cache.
 
-It shares almost no files with the other tracks, and because `app/config/` and
-`app/validation/` are `bpy`-free the backend never imports Blender — it only invokes it as
-a subprocess. **This track can be worked by someone with no Blender installation**, which
-makes it the most cleanly separable work in the project.
-
-**Critical path:** verify → #74 → #6 → #5 → #7 → #8 → #9. Seven serial steps, and the
-route to a trainable dataset. Everything else has slack — if output matters sooner, staff
-this chain first.
+This is the **critical path to a trainable dataset**. Everything else has slack.
 
 ## Not scheduled
 
-Umbrella tasks (#4, #14, #32, #41, #48, #57, #61) span several waves and carry no
-milestone; their subtasks do. **#23** solver and **#24** backend review are backlog —
-deliberately unscheduled rather than forgotten.
+Umbrella tasks (#4, #14, #32, #41, #48, #57, #61) span phases and carry no milestone; their
+subtasks do. **#23** solver and **#24** backend review are backlog — deliberately unscheduled
+rather than forgotten.
 
 ## Keeping this honest
 
-**This file is updated whenever issues change — opened, closed, or edited — in the same
-pass as the change itself.** Not afterwards, and not only when an ordering assumption
-moves.
+**This file is updated whenever issues change — opened, closed, or edited — in the same pass
+as the change itself.** Not afterwards, and not only when an ordering assumption moves.
 
-- **Opened** — place it in a wave, give it the matching milestone, and add it to the graph
-  if anything depends on it or it depends on anything.
-- **Closed** — take it out of the graph and its wave, then check what it was blocking:
-  a closed dependency usually releases something.
-- **Edited** — if scope or dependencies changed, wave placement and graph edges change too.
-- **Consolidated or superseded** — no dangling references to issue numbers that no longer
-  mean anything.
+- **Opened** — place it in a phase, give it the matching milestone, and add it to the graph if
+  anything depends on it or it depends on anything.
+- **Closed** — take it out of the graph and its phase, then check what it was blocking: a
+  closed dependency usually releases something.
+- **Edited** — if scope or dependencies changed, phase placement and graph edges change too.
+- **Consolidated or superseded** — no dangling references to issue numbers that no longer mean
+  anything.
 
-The "Not scheduled" list above and the GitHub milestones are part of this: all three have
-to agree, and they have drifted apart before.
+The "Not scheduled" list and the GitHub milestones are part of this: all three have to agree,
+and they have drifted apart before.
 
 The reason for the strictness is that a stale dependency graph is worse than no graph. The
 point of this file is to say what would be *wasted* by starting something too early, and a
-reader who cannot trust it either ignores it or is misled by it. Both outcomes are worse
-than the maintenance cost.
+reader who cannot trust it either ignores it or is misled by it. Both are worse than the
+maintenance cost.
